@@ -4,7 +4,10 @@ import android.Manifest;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.database.ContentObserver;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.CalendarContract;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -33,6 +36,7 @@ import java.util.List;
 public class DeviceCalendarPlugin extends Plugin {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
+    private ContentObserver calendarObserver;
 
     @PluginMethod
     public void listCalendars(PluginCall call) {
@@ -259,6 +263,115 @@ public class DeviceCalendarPlugin extends Plugin {
             if (deleted == 0) call.reject("No fue posible eliminar el evento"); else call.resolve();
         } catch (Exception error) {
             call.reject("No fue posible eliminar el evento", error);
+        }
+    }
+
+    @PluginMethod
+    public void createEvent(PluginCall call) {
+        if (!canWrite(call)) return;
+        String calendarId = call.getString("calendarId");
+        String title = call.getString("title");
+        String dateValue = call.getString("date");
+        String recurrence = call.getString("recurrence", "none");
+        if (calendarId == null || title == null || dateValue == null) {
+            call.reject("Faltan datos para crear el evento");
+            return;
+        }
+
+        try {
+            long calendarIdValue = Long.parseLong(calendarId);
+            if (!isCalendarWritable(calendarIdValue)) {
+                call.reject("El calendario seleccionado es de solo lectura");
+                return;
+            }
+
+            String startTime = call.getString("startTime");
+            String endTime = call.getString("endTime");
+            boolean allDay = startTime == null || startTime.isEmpty() || endTime == null || endTime.isEmpty();
+            LocalDate date = LocalDate.parse(dateValue, DATE);
+            ZoneId zone = ZoneId.systemDefault();
+            long start;
+            long end;
+            if (allDay) {
+                start = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+                end = date.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+            } else {
+                start = LocalDateTime.parse(dateValue + "T" + startTime).atZone(zone).toInstant().toEpochMilli();
+                end = LocalDateTime.parse(dateValue + "T" + endTime).atZone(zone).toInstant().toEpochMilli();
+            }
+            long durationMillis = Math.max(60_000L, end - start);
+
+            ContentValues values = new ContentValues();
+            values.put(CalendarContract.Events.CALENDAR_ID, calendarIdValue);
+            values.put(CalendarContract.Events.TITLE, title.trim());
+            values.put(CalendarContract.Events.DTSTART, start);
+            values.put(CalendarContract.Events.ALL_DAY, allDay ? 1 : 0);
+            values.put(CalendarContract.Events.EVENT_TIMEZONE, allDay ? "UTC" : zone.getId());
+            String rule = recurrenceRule(recurrence);
+            if (rule == null) {
+                values.put(CalendarContract.Events.DTEND, end);
+            } else {
+                values.put(CalendarContract.Events.RRULE, rule);
+                values.put(CalendarContract.Events.DURATION, allDay
+                    ? "P" + Math.max(1L, durationMillis / 86_400_000L) + "D"
+                    : "PT" + Math.max(60L, durationMillis / 1000L) + "S");
+            }
+
+            Uri created = getContext().getContentResolver().insert(CalendarContract.Events.CONTENT_URI, values);
+            if (created == null) {
+                call.reject("No fue posible crear el evento");
+                return;
+            }
+            JSObject result = new JSObject();
+            result.put("eventId", String.valueOf(ContentUris.parseId(created)));
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("No fue posible crear el evento", error);
+        }
+    }
+
+    @PluginMethod
+    public void startObserving(PluginCall call) {
+        if (calendarObserver == null) {
+            calendarObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
+                @Override
+                public void onChange(boolean selfChange, Uri uri) {
+                    notifyListeners("calendarChanged", new JSObject());
+                }
+            };
+            getContext().getContentResolver().registerContentObserver(
+                CalendarContract.Events.CONTENT_URI,
+                true,
+                calendarObserver
+            );
+        }
+        call.resolve();
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (calendarObserver != null) {
+            getContext().getContentResolver().unregisterContentObserver(calendarObserver);
+            calendarObserver = null;
+        }
+        super.handleOnDestroy();
+    }
+
+    private boolean isCalendarWritable(long calendarId) {
+        Uri uri = ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, calendarId);
+        String[] projection = { CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL };
+        try (Cursor cursor = getContext().getContentResolver().query(uri, projection, null, null, null)) {
+            return cursor != null && cursor.moveToFirst()
+                && cursor.getInt(0) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR;
+        }
+    }
+
+    private String recurrenceRule(String recurrence) {
+        switch (recurrence) {
+            case "daily": return "FREQ=DAILY";
+            case "weekly": return "FREQ=WEEKLY";
+            case "monthly": return "FREQ=MONTHLY";
+            default: return null;
         }
     }
 

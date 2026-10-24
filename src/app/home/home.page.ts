@@ -208,6 +208,8 @@ export class HomePage implements OnInit, OnDestroy {
   repeticion: TaskRepeat = 'none';
   private currentTimeTimer?: ReturnType<typeof setInterval>;
   private appResumeListener?: PluginListenerHandle;
+  private calendarChangeListener?: PluginListenerHandle;
+  private calendarRefreshTimer?: ReturnType<typeof setTimeout>;
   private reminderSettingsReady = false;
 
   readonly etiquetas = this.taskService.etiquetas;
@@ -268,6 +270,12 @@ export class HomePage implements OnInit, OnDestroy {
       void App.addListener('resume', () => this.refreshDeviceCalendarEvents()).then((listener) => {
         this.appResumeListener = listener;
       });
+      void this.deviceCalendarService.observeChanges(() => {
+        if (this.calendarRefreshTimer) clearTimeout(this.calendarRefreshTimer);
+        this.calendarRefreshTimer = setTimeout(() => this.refreshDeviceCalendarEvents(), 500);
+      }).then((listener) => {
+        this.calendarChangeListener = listener;
+      });
     }
     this.currentTimeTimer = setInterval(() => {
       this.currentTime = new Date();
@@ -279,6 +287,8 @@ export class HomePage implements OnInit, OnDestroy {
       clearInterval(this.currentTimeTimer);
     }
     void this.appResumeListener?.remove();
+    void this.calendarChangeListener?.remove();
+    if (this.calendarRefreshTimer) clearTimeout(this.calendarRefreshTimer);
   }
 
   get visibleSections(): TaskSection[] {
@@ -427,6 +437,16 @@ export class HomePage implements OnInit, OnDestroy {
 
   get editingExternalEvent(): DeviceCalendarTask | undefined {
     return this.deviceCalendarTasks.find((event) => event.id === this.editingTaskId);
+  }
+
+  get writableDeviceCalendars(): DeviceCalendar[] {
+    return this.deviceCalendars.filter((calendar) => calendar.writable);
+  }
+
+  get willSaveEventToDeviceCalendar(): boolean {
+    return this.formItemType === 'evento'
+      && this.editingTaskId === null
+      && !!this.deviceCalendarSettings.destinationCalendarId;
   }
 
   calendarTaskTitle(tarea: Task): string {
@@ -711,6 +731,30 @@ export class HomePage implements OnInit, OnDestroy {
           date: this.nuevaFecha,
           startTime: this.nuevaHora || undefined,
           endTime: this.nuevaHoraFin || undefined,
+        });
+        await this.refreshDeviceCalendarEvents();
+        this.cerrarEditorEvento();
+      } catch (error) {
+        this.calendarEditError = this.errorMessage(error);
+      }
+      return;
+    }
+
+    const destinationCalendarId = this.deviceCalendarSettings.destinationCalendarId;
+    if (this.editingTaskId === null && this.formItemType === 'evento' && destinationCalendarId) {
+      if (!this.nuevaFecha) {
+        this.calendarEditError = 'Selecciona una fecha para sincronizar el evento.';
+        return;
+      }
+      this.calendarEditError = '';
+      try {
+        await this.deviceCalendarService.createEvent({
+          calendarId: destinationCalendarId,
+          title: this.nuevoTitulo.trim(),
+          date: this.nuevaFecha,
+          startTime: this.nuevaHora || undefined,
+          endTime: this.nuevaHoraFin || undefined,
+          recurrence: this.repeticion,
         });
         await this.refreshDeviceCalendarEvents();
         this.cerrarEditorEvento();
@@ -1109,9 +1153,23 @@ export class HomePage implements OnInit, OnDestroy {
       ...this.deviceCalendarSettings,
       selectedCalendarIds: [...ids],
       selectionConfigured: true,
+      destinationCalendarId: !selected && this.deviceCalendarSettings.destinationCalendarId === calendarId
+        ? undefined
+        : this.deviceCalendarSettings.destinationCalendarId,
     };
     this.deviceCalendarService.saveSettings(this.deviceCalendarSettings);
     await this.refreshDeviceCalendarEvents();
+  }
+
+  setDestinationCalendar(calendarId: string | null | undefined): void {
+    const selectedCalendarIds = new Set(this.deviceCalendarSettings.selectedCalendarIds);
+    if (calendarId) selectedCalendarIds.add(calendarId);
+    this.deviceCalendarSettings = {
+      ...this.deviceCalendarSettings,
+      destinationCalendarId: calendarId || undefined,
+      selectedCalendarIds: [...selectedCalendarIds],
+    };
+    this.deviceCalendarService.saveSettings(this.deviceCalendarSettings);
   }
 
   isDeviceCalendarEvent(tarea: Task): boolean {
@@ -1147,6 +1205,10 @@ export class HomePage implements OnInit, OnDestroy {
       const result = await this.deviceCalendarService.getCalendars(requestPermission);
       this.deviceCalendars = result.calendars;
       this.deviceCalendarStatus = result.status;
+      const destination = this.deviceCalendarSettings.destinationCalendarId;
+      if (destination && !this.deviceCalendars.some((calendar) => calendar.id === destination && calendar.writable)) {
+        this.setDestinationCalendar(undefined);
+      }
     } catch {
       this.deviceCalendarStatus = 'error';
       this.deviceCalendars = [];

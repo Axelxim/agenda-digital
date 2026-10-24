@@ -331,7 +331,7 @@
     <header class="event-editor-header">
       <button type="button" aria-label="Regresar" (click)="cerrarEditorEvento()"><ion-icon name="chevron-back-outline"></ion-icon></button>
       <h1>{{ formTitle() }}</h1>
-      <button type="button" class="editor-save" [disabled]="!nuevoTitulo.trim() || timeRangeInvalid" (click)="guardarFormulario()">Guardar</button>
+      <button type="button" class="editor-save" [disabled]="!nuevoTitulo.trim() || timeRangeInvalid || (willSaveEventToDeviceCalendar && !nuevaFecha)" (click)="guardarFormulario()">Guardar</button>
     </header>
 
     <div class="event-editor-content">
@@ -372,7 +372,9 @@
         <button type="button" [class.selected]="repeticion === 'monthly'" (click)="repeticion = 'monthly'; eventRepeatExpanded = false">Mensual</button>
       </div>
       }
+      }
 
+      @if (!editingExternalEvent && !willSaveEventToDeviceCalendar) {
       <label class="editor-field editor-color">
         <ion-icon name="pricetag-outline"></ion-icon><span>Color</span><input type="color" [(ngModel)]="eventColor" aria-label="Color del evento" />
       </label>
@@ -701,6 +703,17 @@
           }
 
           @if (deviceCalendarSettings.enabled && deviceCalendarStatus === 'ready') {
+          <ion-select
+            label="Calendario para eventos nuevos"
+            label-placement="stacked"
+            [ngModel]="deviceCalendarSettings.destinationCalendarId ?? ''"
+            (ngModelChange)="setDestinationCalendar($event)"
+          >
+            <ion-select-option value="">Solo en Agenda</ion-select-option>
+            @for (calendar of writableDeviceCalendars; track calendar.id) {
+            <ion-select-option [value]="calendar.id">{{ calendar.name }} · {{ calendar.accountName }}</ion-select-option>
+            }
+          </ion-select>
           <div class="reminder-label-list">
             @for (calendar of deviceCalendars; track calendar.id) {
             <article class="reminder-label-item">

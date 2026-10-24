@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, PluginListenerHandle, registerPlugin } from '@capacitor/core';
 import { Task } from './task.model';
 
 export interface DeviceCalendar {
@@ -77,6 +77,16 @@ interface DeviceCalendarPlugin {
     originalInstanceStart: number;
   }): Promise<void>;
   deleteEvent(options: { eventId: string }): Promise<void>;
+  createEvent(options: {
+    calendarId: string;
+    title: string;
+    date: string;
+    startTime?: string;
+    endTime?: string;
+    recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
+  }): Promise<{ eventId: string }>;
+  startObserving(): Promise<void>;
+  addListener(eventName: 'calendarChanged', listener: () => void): Promise<PluginListenerHandle>;
 }
 
 type PermissionState = 'prompt' | 'prompt-with-rationale' | 'granted' | 'denied';
@@ -85,6 +95,7 @@ export interface DeviceCalendarSettings {
   enabled: boolean;
   selectedCalendarIds: string[];
   selectionConfigured: boolean;
+  destinationCalendarId?: string;
 }
 
 const DeviceCalendarNative = registerPlugin<DeviceCalendarPlugin>('DeviceCalendar');
@@ -102,6 +113,7 @@ export class DeviceCalendarService {
       enabled: false,
       selectedCalendarIds: [],
       selectionConfigured: false,
+      destinationCalendarId: undefined,
     };
     const stored = localStorage.getItem(this.storageKey);
     if (!stored) return fallback;
@@ -114,6 +126,9 @@ export class DeviceCalendarService {
           ? parsed.selectedCalendarIds.filter((id): id is string => typeof id === 'string')
           : [],
         selectionConfigured: parsed.selectionConfigured === true,
+        destinationCalendarId: typeof parsed.destinationCalendarId === 'string'
+          ? parsed.destinationCalendarId
+          : undefined,
       };
     } catch {
       return fallback;
@@ -198,6 +213,26 @@ export class DeviceCalendarService {
   async deleteEvent(event: DeviceCalendarTask): Promise<void> {
     await this.requireWritePermission();
     await DeviceCalendarNative.deleteEvent({ eventId: event.externalEventId });
+  }
+
+  async createEvent(options: {
+    calendarId: string;
+    title: string;
+    date: string;
+    startTime?: string;
+    endTime?: string;
+    recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
+  }): Promise<string> {
+    await this.requireWritePermission();
+    const result = await DeviceCalendarNative.createEvent(options);
+    return result.eventId;
+  }
+
+  async observeChanges(listener: () => void): Promise<PluginListenerHandle | undefined> {
+    if (!this.supported) return undefined;
+    const handle = await DeviceCalendarNative.addListener('calendarChanged', listener);
+    await DeviceCalendarNative.startObserving();
+    return handle;
   }
 
   private async requireWritePermission(): Promise<void> {
