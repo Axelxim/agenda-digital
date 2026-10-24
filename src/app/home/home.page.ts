@@ -35,6 +35,7 @@ import {
       close,
       closeCircleOutline,
   ellipsisHorizontal,
+  giftOutline,
   homeOutline,
   menuOutline,
   notificationsOutline,
@@ -158,6 +159,12 @@ export class HomePage implements OnInit, OnDestroy {
   ];
   eventEditorOpen = false;
   eventRepeatExpanded = false;
+  birthdayEditorOpen = false;
+  birthdayRepeatExpanded = false;
+  birthdayNameValue = '';
+  birthdayDate = '';
+  birthdayRepeatsYearly = true;
+  birthdaySaveError = '';
   confirmingEventDeletion = false;
   expandedTaskId: number | null = null;
   expandedReminderLabel: TaskLabel | null = null;
@@ -239,6 +246,7 @@ export class HomePage implements OnInit, OnDestroy {
   close,
   closeCircleOutline,
       ellipsisHorizontal,
+      giftOutline,
       homeOutline,
       menuOutline,
       notificationsOutline,
@@ -580,6 +588,46 @@ export class HomePage implements OnInit, OnDestroy {
     this.eventRepeatExpanded = false;
     this.confirmingEventDeletion = false;
     this.eventEditorOpen = true;
+  }
+
+  nuevoCumpleanos(): void {
+    this.birthdayNameValue = '';
+    this.birthdayDate = '';
+    this.birthdayRepeatsYearly = true;
+    this.birthdayRepeatExpanded = false;
+    this.birthdaySaveError = '';
+    this.birthdayEditorOpen = true;
+  }
+
+  cerrarEditorCumpleanos(): void {
+    this.birthdayEditorOpen = false;
+    this.birthdayRepeatExpanded = false;
+    this.birthdaySaveError = '';
+  }
+
+  async guardarCumpleanos(): Promise<void> {
+    const name = this.birthdayNameValue.trim();
+    if (!name || !this.birthdayDate) return;
+
+    const calendarId = this.deviceCalendarSettings.destinationCalendarId;
+    if (!calendarId) {
+      this.birthdaySaveError = 'Selecciona en Más el calendario para eventos nuevos.';
+      return;
+    }
+
+    this.birthdaySaveError = '';
+    try {
+      await this.deviceCalendarService.createEvent({
+        calendarId,
+        title: `Cumpleaños de ${name}`,
+        date: this.birthdayDate,
+        recurrence: this.birthdayRepeatsYearly ? 'yearly' : 'none',
+      });
+      await this.refreshDeviceCalendarEvents();
+      this.cerrarEditorCumpleanos();
+    } catch (error) {
+      this.birthdaySaveError = this.errorMessage(error);
+    }
   }
 
   editarTarea(tarea: Task): void {
