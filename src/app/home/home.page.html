@@ -1,20 +1,930 @@
-<ion-header [translucent]="true">
+<ion-header class="app-header" [class.editor-open]="eventEditorOpen" [translucent]="true">
   <ion-toolbar>
-    <ion-title>
-      Blank
-    </ion-title>
+    <ion-title>{{ titulo }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button fill="clear" [attr.aria-label]="notificationButtonLabel()" (click)="activateNotifications()">
+        <ion-icon name="notifications-outline"></ion-icon>
+      </ion-button>
+      <ion-button fill="clear" aria-label="Más opciones" (click)="selectView('mas')">
+        <ion-icon name="settings-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content [fullscreen]="true">
-  <ion-header collapse="condense">
-    <ion-toolbar>
-      <ion-title size="large">Blank</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <main class="page-shell">
+    @if (selectedView === 'hoy') {
+    <section class="event-overview">
+      @if (activeEvents.length > 0) {
+      <div class="current-events">
+      <div class="section-heading"><h2>En curso ahora</h2></div>
+      @for (evento of activeEvents; track evento.id) {
+      <article class="current-event" [style.--event-color]="evento.color ?? '#2563eb'">
+        <span class="current-event-dot"></span>
+        <div><strong>{{ evento.titulo }}</strong><small>{{ evento.hora }} – {{ taskEndTime(evento) }}</small></div>
+      </article>
+      }
+      </div>
+      }
+      @if (nextEvent; as evento) {
+      <div class="current-events">
+        <div class="section-heading"><h2>Siguiente evento</h2></div>
+        <article class="current-event next-event" [style.--event-color]="evento.color ?? '#2563eb'">
+          <span class="current-event-dot"></span>
+          <div><strong>{{ evento.titulo }}</strong><small>{{ evento.hora }} – {{ taskEndTime(evento) }}</small></div>
+        </article>
+      </div>
+      }
+      @if (followingEvent; as evento) {
+      <div class="current-events">
+        <div class="section-heading"><h2>Después</h2></div>
+        <article class="current-event next-event" [style.--event-color]="evento.color ?? '#2563eb'">
+          <span class="current-event-dot"></span>
+          <div><strong>{{ evento.titulo }}</strong><small>{{ evento.hora }} – {{ taskEndTime(evento) }}</small></div>
+        </article>
+      </div>
+      }
+      @if (activeEvents.length === 0 && !nextEvent) {
+      <div class="day-complete"><ion-icon name="checkbox-outline"></ion-icon><span>Es todo por hoy</span></div>
+      }
+    </section>
+    <section class="summary-grid" aria-label="Resumen de tareas">
+      @for (card of resumenCards; track card.id) {
+      <div class="summary-card" [class.is-empty]="summaryValue(card.key) === 0">
+        <strong>{{ summaryValue(card.key) }}</strong>
+        <span>{{ card.label }}</span>
+      </div>
+      }
+    </section>
 
-  <div id="container">
-    <strong>Ready to create an app?</strong>
-    <p>Start with Ionic <a target="_blank" rel="noopener noreferrer" href="https://ionicframework.com/docs/components">UI Components</a></p>
-  </div>
+    @if (birthdayEventsToday.length > 0) {
+    <section class="task-section" style="margin-bottom:18px" aria-label="Cumpleaños de hoy">
+      <div class="section-heading"><h2 style="color:#d77aa0">Cumpleaños de hoy</h2></div>
+      @for (birthday of birthdayEventsToday; track birthday.id) {
+      <article class="current-event next-event" style="--event-color:#c45b86" [attr.role]="birthday.writable ? 'button' : null" [attr.tabindex]="birthday.writable ? 0 : null" (click)="openCalendarItem(birthday)" (keydown.enter)="openCalendarItem(birthday)">
+        <span class="current-event-dot"></span>
+        <div><strong>{{ birthdayName(birthday) }}</strong><small>Todo el día</small></div>
+      </article>
+      }
+    </section>
+    }
+
+    <section class="section-stack">
+      @if (visibleSections.length === 0) {
+      <div class="empty-state">
+        <h2>Todo en calma</h2>
+        <p>No tienes pendientes por ahora.</p>
+      </div>
+      } @for (section of visibleSections; track section.id) {
+      <div class="task-section">
+        <div class="section-heading home-section-heading" [class.expired-heading]="section.id === 'vencidas'">
+          <div>
+            <ion-icon [name]="homeSectionIcon(section.id)"></ion-icon>
+            <h2>{{ homeSectionTitle(section.id) }}</h2>
+          </div>
+          <span>{{ homeSectionMeta(section) }}</span>
+        </div>
+
+        @for (tarea of section.tareas; track tarea.id) {
+        <ng-container
+          [ngTemplateOutlet]="taskCard"
+          [ngTemplateOutletContext]="{ tarea: tarea, home: true }"
+        ></ng-container>
+        }
+      </div>
+      }
+    </section>
+    }
+
+    @if (selectedView === 'calendario') {
+    <section class="day-agenda">
+      <div class="agenda-controls">
+        <div class="calendar-header">
+          <div>
+            <p class="agenda-label">Agenda diaria</p>
+            <h1>{{ calendarView === 'mes' ? monthTitle : formatDate(selectedDate) }}</h1>
+          </div>
+          <div class="calendar-actions">
+            <ion-button fill="clear" size="small" aria-label="Día anterior" (click)="previousDay()">
+              <ion-icon name="chevron-back-outline"></ion-icon>
+            </ion-button>
+            <button type="button" class="today-button" (click)="goToToday()">Ir a la hora actual</button>
+            <ion-button fill="clear" size="small" aria-label="Día siguiente" (click)="nextDay()">
+              <ion-icon name="chevron-forward-outline"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+
+        <div class="calendar-view-switch" role="tablist" aria-label="Tipo de calendario">
+          <button type="button" [class.active]="calendarView === 'dia'" (click)="calendarView = 'dia'">Día</button>
+          <button type="button" [class.active]="calendarView === 'semana'" (click)="calendarView = 'semana'">Semana</button>
+          <button type="button" [class.active]="calendarView === 'mes'" (click)="calendarView = 'mes'">Mes</button>
+        </div>
+      </div>
+
+      @if (calendarView === 'dia') {
+      @if (untimedSelectedDateTasks.length > 0) {
+      <div class="unscheduled-tasks">
+        <p>Sin horario</p>
+        @for (tarea of untimedSelectedDateTasks; track tarea.id) {
+        @if (isDeviceCalendarEvent(tarea)) {
+        <article class="month-event" [style.--event-color]="tarea.color ?? '#2563eb'">
+          <strong>{{ calendarTaskTitle(tarea) }}</strong><small>Todo el día</small>
+        </article>
+        } @else {
+        <ng-container [ngTemplateOutlet]="taskCard" [ngTemplateOutletContext]="{ tarea: tarea }"></ng-container>
+        }
+        }
+      </div>
+      }
+
+      @if (birthdayEventsForSelectedDate.length > 0) {
+      @for (birthday of birthdayEventsForSelectedDate; track birthday.id) {
+      <div class="birthday-day-banner" style="display:grid;gap:2px;margin:10px 0 6px 52px;padding:8px 10px;border-left:3px solid #c45b86;border-radius:6px;background:color-mix(in srgb,#c45b86 12%,var(--surface))" [attr.role]="birthday.writable ? 'button' : null" [attr.tabindex]="birthday.writable ? 0 : null" (click)="openCalendarItem(birthday)" (keydown.enter)="openCalendarItem(birthday)">
+        <strong style="color:#d77aa0;font-size:13px">Cumpleaños · {{ birthdayName(birthday) }}</strong>
+        <small style="overflow:hidden;color:var(--muted);font-size:12px;text-overflow:ellipsis;white-space:nowrap">{{ birthday.writable ? 'Todo el día · Toca para editar' : 'Todo el día' }}</small>
+      </div>
+      }
+      }
+
+      <div #agendaTimeline class="agenda-timeline" [class.has-birthday]="birthdayEventsForSelectedDate.length > 0" [style.--hour-height.px]="agendaHourHeight" aria-label="Horas del día">
+        @for (hour of agendaHours; track hour) {
+        <div class="time-slot" [class.current-hour]="isCurrentHour(hour)">
+          <span class="hour-label">{{ hour }}</span>
+          @if (isCurrentHour(hour)) {
+          <span class="now-indicator" [style.top.%]="currentMinutePosition" aria-label="Hora actual"></span>
+          }
+          <div class="slot-content" role="button" tabindex="0" (click)="nuevoEvento(selectedDate, hour)" (keydown.enter)="nuevoEvento(selectedDate, hour)">
+            @for (tarea of tasksForHour(hour); track tarea.id) {
+            <span class="agenda-task" [class.expanded]="isEventExpanded(tarea)" [class.child-task]="!!tarea.parentId" [style.--event-color]="tarea.color ?? '#2563eb'" [style.left.%]="calendarEventLayout(tarea, selectedDate).left" [style.width.%]="calendarEventLayout(tarea, selectedDate).width" [style.top.px]="agendaEventOffset(tarea)" [style.height.px]="agendaEventHeight(tarea) + (isEventExpanded(tarea) ? 72 : 0)" role="button" tabindex="0" [attr.aria-expanded]="isEventExpanded(tarea)" (click)="openCalendarItem(tarea); $event.stopPropagation()" (keydown.enter)="openCalendarItem(tarea); $event.stopPropagation()">
+              <strong>{{ calendarTaskTitle(tarea) }}</strong>
+              <small>{{ tarea.hora }} – {{ taskEndTime(tarea) }}</small>
+              <ng-container [ngTemplateOutlet]="eventInlineActions" [ngTemplateOutletContext]="{ tarea: tarea }"></ng-container>
+            </span>
+            }
+          </div>
+        </div>
+        }
+      </div>
+      } @else if (calendarView === 'semana') {
+      @if (preestablecidos.length > 0) {
+      <div class="weekly-preset-actions">
+        @for (preset of preestablecidos; track preset.id) {
+        <div class="weekly-preset-control">
+          <button type="button" [style.border-color]="preset.color" (click)="agregarPreestablecidoEnSemana(preset)">Agregar {{ preset.nombre }}</button>
+          <button type="button" class="remove-preset-week" (click)="quitarPreestablecidoDeSemana(preset)">Quitar</button>
+        </div>
+        }
+      </div>
+      }
+      <div class="week-scroll" aria-label="Agenda semanal">
+        <div class="week-grid">
+          <div class="week-header" aria-label="Días de la semana">
+            <span></span>
+            @for (day of weekDays; track day.iso) {
+            <button type="button" [class.selected]="day.iso === selectedDate" (click)="selectDate(day.iso)">
+              <small>{{ day.shortLabel }}</small><strong>{{ day.day }}</strong>
+            </button>
+            }
+          </div>
+          <div class="week-timeline">
+        @for (hour of agendaHours; track hour) {
+        <div class="week-hour-row">
+          <span class="hour-label">{{ hour }}</span>
+          @for (day of weekDays; track day.iso) {
+          <div class="week-slot" role="button" tabindex="0" (click)="nuevoEvento(day.iso, hour)" (keydown.enter)="nuevoEvento(day.iso, hour)">
+            @for (tarea of tasksForDateAndHour(day.iso, hour); track tarea.id) {
+            <span class="agenda-task" [class.expanded]="isEventExpanded(tarea)" [class.child-task]="!!tarea.parentId" [style.--event-color]="tarea.color ?? '#2563eb'" [style.left.%]="calendarEventLayout(tarea, day.iso).left" [style.width.%]="calendarEventLayout(tarea, day.iso).width" [style.top.px]="weekEventOffset(tarea)" [style.height.px]="weekEventHeight(tarea) + (isEventExpanded(tarea) ? 60 : 0)" role="button" tabindex="0" [attr.aria-expanded]="isEventExpanded(tarea)" (click)="openCalendarItem(tarea); $event.stopPropagation()" (keydown.enter)="openCalendarItem(tarea); $event.stopPropagation()">
+              <strong>{{ calendarTaskTitle(tarea) }}</strong>
+              <small>{{ tarea.hora }} – {{ taskEndTime(tarea) }}</small>
+              <ng-container [ngTemplateOutlet]="eventInlineActions" [ngTemplateOutletContext]="{ tarea: tarea }"></ng-container>
+            </span>
+            }
+          </div>
+          }
+        </div>
+        }
+          </div>
+        </div>
+      </div>
+      } @else {
+      <div class="weekdays" aria-hidden="true">
+        <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+      </div>
+      <div class="calendar-grid">
+        @for (day of calendarDays; track day.iso) {
+        <button type="button" class="calendar-day" [class.outside]="!day.currentMonth" [class.selected]="day.selected" [class.has-tasks]="day.hasTasks" (click)="selectMonthDate(day.iso)">
+          <span>{{ day.label }}</span>
+        </button>
+        }
+      </div>
+      <section class="month-events" aria-live="polite">
+        <div class="section-heading"><h2>Eventos del {{ formatDate(selectedDate) }}</h2></div>
+        @if (selectedDateTasks.length > 0) {
+        <div class="month-event-list">
+          @for (tarea of selectedDateTasks; track tarea.id) {
+          <article class="month-event" [class.expanded]="isEventExpanded(tarea)" [style.--event-color]="tarea.color ?? '#2563eb'" role="button" tabindex="0" [attr.aria-expanded]="isEventExpanded(tarea)" (click)="openCalendarItem(tarea)" (keydown.enter)="openCalendarItem(tarea)">
+            <strong>{{ calendarTaskTitle(tarea) }}</strong><small>{{ tarea.hora ? tarea.hora + ' – ' + taskEndTime(tarea) : (isDeviceCalendarEvent(tarea) ? 'Todo el día' : 'Sin horario') }}</small>
+            <ng-container [ngTemplateOutlet]="eventInlineActions" [ngTemplateOutletContext]="{ tarea: tarea }"></ng-container>
+          </article>
+          }
+        </div>
+        } @else {
+        <p class="month-events-empty">No hay eventos para este día.</p>
+        }
+      </section>
+      }
+    </section>
+    }
+
+    @if (selectedView === 'pendientes') {
+    <section class="pending-view">
+      <h1>Tareas</h1>
+
+      <div class="task-filter-tabs" role="tablist" aria-label="Filtrar tareas">
+        <button
+          type="button"
+          role="tab"
+          [class.active]="pendingFilter === 'pendientes'"
+          [attr.aria-selected]="pendingFilter === 'pendientes'"
+          (click)="pendingFilter = 'pendientes'"
+        >
+          Pendientes
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [class.active]="pendingFilter === 'programadas'"
+          [attr.aria-selected]="pendingFilter === 'programadas'"
+          (click)="pendingFilter = 'programadas'"
+        >
+          Programadas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [class.active]="pendingFilter === 'vencidas'"
+          [attr.aria-selected]="pendingFilter === 'vencidas'"
+          (click)="pendingFilter = 'vencidas'"
+        >
+          Vencidas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [class.active]="pendingFilter === 'completadas'"
+          [attr.aria-selected]="pendingFilter === 'completadas'"
+          (click)="pendingFilter = 'completadas'"
+        >
+          Completadas
+        </button>
+      </div>
+
+      <div class="task-filter-heading">
+        <h2>{{ taskFilterSectionTitle }}</h2>
+        <span>{{ filteredTasks.length }} {{ filteredTasks.length === 1 ? 'tarea' : 'tareas' }}</span>
+      </div>
+
+      <div class="section-stack task-filter-list">
+        @if (filteredTasks.length === 0) {
+        <div class="empty-state">
+          <h2>Sin resultados</h2>
+          <p>No hay tareas en este filtro.</p>
+        </div>
+        } @for (tarea of filteredTasks; track tarea.id) {
+        <ng-container
+          [ngTemplateOutlet]="taskCard"
+          [ngTemplateOutletContext]="{ tarea: tarea, home: true }"
+        ></ng-container>
+        }
+      </div>
+    </section>
+    }
+
+    @if (selectedView === 'mas') {
+    <section class="more-view">
+      <h1>Más</h1>
+      <button type="button" class="preset-entry" (click)="abrirPreestablecidos()">
+        <span class="preset-entry-icon"><ion-icon name="calendar-outline"></ion-icon></span>
+        <span><strong>Eventos preestablecidos</strong><small>Crea y administra tus horarios guardados</small></span>
+        <ion-icon name="chevron-forward-outline"></ion-icon>
+      </button>
+      <button type="button" class="preset-entry" (click)="abrirConfiguracion()">
+        <span class="preset-entry-icon"><ion-icon name="pricetag-outline"></ion-icon></span>
+        <span><strong>Etiquetas y recordatorios</strong><small>Configura avisos automáticos por categoría</small></span>
+        <ion-icon name="chevron-forward-outline"></ion-icon>
+      </button>
+      <button type="button" class="preset-entry" (click)="abrirCalendariosDispositivo()">
+        <span class="preset-entry-icon"><ion-icon name="calendar-outline"></ion-icon></span>
+        <span><strong>Calendarios del dispositivo</strong><small>Muestra eventos y cumpleaños sincronizados</small></span>
+        <ion-icon name="chevron-forward-outline"></ion-icon>
+      </button>
+    </section>
+    }
+
+  </main>
+
+  @if (eventEditorOpen) {
+  <section class="event-editor-screen" aria-label="Editor de evento">
+    <div class="event-editor-panel">
+    <header class="event-editor-header">
+      <button type="button" aria-label="Regresar" (click)="cerrarEditorEvento()"><ion-icon name="chevron-back-outline"></ion-icon></button>
+      <h1>{{ formTitle() }}</h1>
+      <button type="button" class="editor-save" [disabled]="!nuevoTitulo.trim() || timeRangeInvalid" (click)="guardarFormulario()">Guardar</button>
+    </header>
+
+    <div class="event-editor-content">
+      <label class="editor-field editor-title-field">
+        <span class="editor-label">Nombre</span>
+        <ion-input placeholder="Nombre del evento" [(ngModel)]="nuevoTitulo"></ion-input>
+      </label>
+
+      <label class="editor-field">
+        <span class="editor-label">Fecha</span>
+        <ion-icon name="calendar-outline"></ion-icon>
+        <ion-input type="date" [(ngModel)]="nuevaFecha"></ion-input>
+      </label>
+
+      <div class="editor-time-row">
+        <label class="editor-field">
+          <span class="editor-label">Inicio</span>
+          <ion-icon name="time-outline"></ion-icon>
+          <ion-input type="time" [(ngModel)]="nuevaHora"></ion-input>
+        </label>
+        <label class="editor-field">
+          <span class="editor-label">Fin</span>
+          <ion-icon name="time-outline"></ion-icon>
+          <ion-input type="time" [(ngModel)]="nuevaHoraFin"></ion-input>
+        </label>
+      </div>
+      @if (timeRangeInvalid) { <p class="time-validation">La hora de fin debe ser posterior a la de inicio.</p> }
+
+      @if (!editingExternalEvent) {
+      <button type="button" class="editor-field editor-repeat" (click)="eventRepeatExpanded = !eventRepeatExpanded" [attr.aria-expanded]="eventRepeatExpanded">
+        <ion-icon name="repeat-outline"></ion-icon><span>Repetir</span><small>{{ repeticion === 'none' ? 'Nunca' : repeticion === 'daily' ? 'Diario' : repeticion === 'weekly' ? 'Semanal' : 'Mensual' }}</small>
+      </button>
+      @if (eventRepeatExpanded) {
+      <div class="repeat-options" role="group" aria-label="Repetición">
+        <button type="button" [class.selected]="repeticion === 'none'" (click)="repeticion = 'none'; eventRepeatExpanded = false">No se repite</button>
+        <button type="button" [class.selected]="repeticion === 'daily'" (click)="repeticion = 'daily'; eventRepeatExpanded = false">Diario</button>
+        <button type="button" [class.selected]="repeticion === 'weekly'" (click)="repeticion = 'weekly'; eventRepeatExpanded = false">Semanal</button>
+        <button type="button" [class.selected]="repeticion === 'monthly'" (click)="repeticion = 'monthly'; eventRepeatExpanded = false">Mensual</button>
+      </div>
+      }
+
+      <label class="editor-field editor-color">
+        <ion-icon name="pricetag-outline"></ion-icon><span>Color</span><input type="color" [(ngModel)]="eventColor" aria-label="Color del evento" />
+      </label>
+      }
+
+      @if (calendarEditError) { <p class="time-validation">{{ calendarEditError }}</p> }
+      @if (editingExternalEvent?.externalRecurring) {
+      <p class="time-validation" style="color:var(--muted)">Los cambios se aplicarán a toda la serie.</p>
+      }
+
+      @if (editingTaskId !== null) {
+      <div class="editor-delete">
+        @if (!confirmingEventDeletion) {
+        <button type="button" (click)="confirmingEventDeletion = true"><ion-icon name="trash-outline"></ion-icon>Eliminar evento</button>
+        } @else {
+        <span>¿Eliminar este evento?</span><button type="button" (click)="confirmingEventDeletion = false">No</button><button type="button" class="danger" (click)="eliminarEventoDesdeEditor()">Sí, eliminar</button>
+        }
+      </div>
+      }
+    </div>
+    </div>
+  </section>
+  }
+
+  @if (selectedView === 'hoy') {
+  <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="today-fab">
+    <ion-fab-button aria-label="Crear">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+    <ion-fab-list side="top">
+      <ion-fab-button aria-label="Crear tarea" (click)="nuevaTarea()"><ion-icon name="checkbox-outline"></ion-icon></ion-fab-button>
+      <ion-fab-button aria-label="Crear evento" (click)="nuevoEvento()"><ion-icon name="calendar-outline"></ion-icon></ion-fab-button>
+    </ion-fab-list>
+  </ion-fab>
+  }
+
+  <ion-modal cssClass="task-editor-modal">
+    <ng-template>
+      <header class="event-editor-header task-editor-header">
+        <button type="button" aria-label="Volver" (click)="cerrarModal()">
+          <ion-icon name="chevron-back-outline"></ion-icon>
+        </button>
+        <h1>{{ formTitle() }}</h1>
+        <button
+          type="button"
+          class="editor-save"
+          [disabled]="(formMode !== 'reschedule' && !nuevoTitulo.trim()) || timeRangeInvalid"
+          (click)="guardarFormulario()"
+        >
+          Guardar
+        </button>
+      </header>
+
+      <ion-content class="modal-content task-editor-content">
+        <div class="form-stack">
+          <ion-input
+            [label]="formItemType === 'evento' ? 'Evento' : 'Tarea'"
+            label-placement="stacked"
+            [placeholder]="formItemType === 'evento' ? 'Escribe un evento' : 'Escribe una tarea'"
+            [(ngModel)]="nuevoTitulo"
+            [disabled]="formMode === 'reschedule'"
+          ></ion-input>
+
+          @if (formItemType === 'evento' && formMode !== 'reschedule' && preestablecidos.length > 0) {
+          <div class="event-templates">
+            <span>Eventos rápidos</span>
+            <div>
+              @for (preset of preestablecidos; track preset.id) {
+              <button type="button" [style.border-color]="preset.color" (click)="applyEventPreset(preset)">
+                {{ preset.nombre }}
+              </button>
+              }
+            </div>
+          </div>
+          }
+
+          @if (formItemType === 'tarea') {
+          <div class="priority-picker">
+            <button
+              type="button"
+              [class.selected]="prioridad === 'baja'"
+              (click)="prioridad = 'baja'"
+              [disabled]="formMode === 'reschedule'"
+            >
+              Baja
+            </button>
+            <button
+              type="button"
+              [class.selected]="prioridad === 'media'"
+              (click)="prioridad = 'media'"
+              [disabled]="formMode === 'reschedule'"
+            >
+              Media
+            </button>
+            <button
+              type="button"
+              [class.selected]="prioridad === 'alta'"
+              (click)="prioridad = 'alta'"
+              [disabled]="formMode === 'reschedule'"
+            >
+              Alta
+            </button>
+          </div>
+          }
+
+          <ion-input
+            label="Fecha"
+            label-placement="stacked"
+            type="date"
+            [(ngModel)]="nuevaFecha"
+          ></ion-input>
+
+          <div class="time-range">
+            <ion-input
+              label="Hora de inicio"
+              label-placement="stacked"
+              type="time"
+              [(ngModel)]="nuevaHora"
+            ></ion-input>
+
+            <ion-input
+              label="Hora de fin"
+              label-placement="stacked"
+              type="time"
+              [(ngModel)]="nuevaHoraFin"
+            ></ion-input>
+          </div>
+          @if (timeRangeInvalid) {
+          <p class="time-validation">La hora de fin debe ser posterior a la de inicio.</p>
+          }
+
+          @if (formMode !== 'reschedule') {
+          @if (formItemType === 'tarea') {
+          <ion-select
+            label="Etiqueta"
+            label-placement="stacked"
+            placeholder="Sin etiqueta"
+            [(ngModel)]="etiqueta"
+          >
+            @for (label of etiquetas; track label.nombre) {
+            <ion-select-option [value]="label.nombre">
+              {{ label.nombre }}
+            </ion-select-option>
+            }
+          </ion-select>
+
+          <ion-select
+            label="Actividad madre"
+            label-placement="stacked"
+            placeholder="Sin actividad madre"
+            [(ngModel)]="actividadMadreId"
+          >
+            <ion-select-option [value]="undefined">Sin actividad madre</ion-select-option>
+            @for (actividad of actividadesMadreDisponibles; track actividad.id) {
+            <ion-select-option [value]="actividad.id">
+              {{ actividad.titulo }}
+            </ion-select-option>
+            }
+          </ion-select>
+          }
+
+          <ion-select
+            label="Repetir"
+            label-placement="stacked"
+            [(ngModel)]="repeticion"
+          >
+            <ion-select-option value="none">No se repite</ion-select-option>
+            <ion-select-option value="daily">Diario</ion-select-option>
+            <ion-select-option value="weekly">Semanal</ion-select-option>
+            <ion-select-option value="monthly">Mensual</ion-select-option>
+          </ion-select>
+
+          }
+
+          <div class="form-actions">
+            @if (editingTaskId !== null) {
+            <ion-button
+              color="danger"
+              fill="outline"
+              (click)="descartarDesdeFormulario()"
+            >
+              Descartar
+            </ion-button>
+            }
+          </div>
+        </div>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <ion-modal #presetModal>
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Eventos preestablecidos</ion-title>
+          <ion-buttons slot="end"><ion-button fill="clear" (click)="cerrarPreestablecidos()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <section class="preset-manager modal-preset-manager">
+          <p>Crea plantillas para escuela, trabajo, gym u otras actividades.</p>
+          <div class="preset-form">
+            <ion-input label="Nombre del evento" label-placement="stacked" placeholder="Ej. Escuela" [(ngModel)]="presetNombre"></ion-input>
+            <div class="time-range">
+              <ion-input label="Hora de inicio" label-placement="stacked" type="time" [(ngModel)]="presetHoraInicio" (ngModelChange)="actualizarHorarioPreestablecido()"></ion-input>
+              <ion-input label="Hora de fin" label-placement="stacked" type="time" [(ngModel)]="presetHoraFin" (ngModelChange)="actualizarHorarioPreestablecido()"></ion-input>
+            </div>
+            <label class="color-picker">Color <input type="color" [(ngModel)]="presetColor" /></label>
+            <div class="day-picker"><span>Días — toca uno para asignar su horario</span><div>@for (day of diasSemana; track day; let index = $index) {<button type="button" class="day-button" [style.background-color]="presetDias.includes(index) ? '#2563eb' : '#171b24'" [style.border-color]="presetDias.includes(index) ? '#60a5fa' : '#344054'" [style.color]="presetDias.includes(index) ? '#ffffff' : '#a5b0c3'" (click)="togglePresetDay(index)">{{ day }}</button>}</div>@if (presetActiveDay !== null) {<button type="button" class="remove-day" (click)="quitarDiaPreestablecido()">Quitar día seleccionado</button>}</div>
+            <ion-button (click)="guardarPreestablecido()" [disabled]="!presetNombre.trim()">{{ editingPresetId === null ? 'Guardar preestablecido' : 'Guardar cambios' }}</ion-button>
+            @if (editingPresetId !== null) {<ion-button fill="outline" (click)="cancelarEdicionPreestablecido()">Cancelar edición</ion-button>}
+          </div>
+          @if (preestablecidos.length > 0) {
+          <div class="preset-list">@for (preset of preestablecidos; track preset.id) {<div class="preset-row"><span class="label-dot" [style.background]="preset.color"></span><div><strong>{{ preset.nombre }}</strong><small>{{ preset.horaInicio }} – {{ preset.horaFin }} · {{ preset.dias.length ? preset.dias.length + ' días' : 'Sin días' }}</small></div><button type="button" (click)="editarPreestablecido(preset)">Editar</button></div>}</div>
+          }
+        </section>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <ion-modal #settingsModal cssClass="settings-reminder-modal">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Etiquetas</ion-title>
+          <ion-buttons slot="end"><ion-button fill="clear" (click)="cerrarConfiguracion()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <section class="settings-labels reminder-settings">
+          <h2>Recordatorios por etiqueta</h2>
+          <p>Define cuándo recibir avisos para los pendientes de cada categoría.</p>
+          <div class="reminder-label-list">
+            @for (label of etiquetas; track label.nombre) {
+            <article class="reminder-label-item" [class.expanded]="expandedReminderLabel === label.nombre">
+              <div class="reminder-label-summary">
+                <button type="button" (click)="toggleReminderLabel(label.nombre)" [attr.aria-expanded]="expandedReminderLabel === label.nombre">
+                  <span class="label-dot" [style.--label-color]="labelColor(label.nombre)"></span>
+                  <span><strong>{{ label.nombre }}</strong><small>{{ labelCount(label.nombre) }} pendientes</small></span>
+                  <ion-icon name="chevron-down-outline"></ion-icon>
+                </button>
+                <ion-toggle
+                  [checked]="reminderSettingsFor(label.nombre).enabled"
+                  [attr.aria-label]="'Activar recordatorios para ' + label.nombre"
+                  (click)="$event.stopPropagation()"
+                  (ionChange)="setLabelRemindersEnabled(label.nombre, $event.detail.checked)"
+                ></ion-toggle>
+              </div>
+
+              @if (expandedReminderLabel === label.nombre) {
+              <div class="reminder-label-editor">
+                <div class="reminder-editor-heading">
+                  <strong>Avisar antes</strong>
+                  <span>Selecciona uno o varios momentos</span>
+                </div>
+                <div class="reminder-lead-options">
+                  @for (option of reminderLeadOptions; track option.minutes) {
+                  <button
+                    type="button"
+                    [class.selected]="reminderSettingsFor(label.nombre).advanceMinutes.includes(option.minutes)"
+                    [attr.aria-pressed]="reminderSettingsFor(label.nombre).advanceMinutes.includes(option.minutes)"
+                    (click)="toggleReminderLead(label.nombre, option.minutes)"
+                  >
+                    {{ option.label }}
+                  </button>
+                  }
+                </div>
+
+                <div class="reminder-setting-row">
+                  <span><strong>Al vencer</strong><small>Preguntar “¿Ya lo entregaste?”</small></span>
+                  <ion-toggle
+                    [checked]="reminderSettingsFor(label.nombre).duePromptEnabled"
+                    [attr.aria-label]="'Preguntar al vencer para ' + label.nombre"
+                    (ionChange)="setDuePromptEnabled(label.nombre, $event.detail.checked)"
+                  ></ion-toggle>
+                </div>
+
+                <label class="reminder-time-row">
+                  <span><strong>Sin hora asignada</strong><small>Hora predeterminada del aviso</small></span>
+                  <ion-input
+                    type="time"
+                    [ngModel]="reminderSettingsFor(label.nombre).dateOnlyTime"
+                    (ngModelChange)="setDateOnlyReminderTime(label.nombre, $event)"
+                  ></ion-input>
+                </label>
+              </div>
+              }
+            </article>
+            }
+          </div>
+        </section>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <ion-modal #deviceCalendarModal cssClass="settings-reminder-modal">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Calendarios</ion-title>
+          <ion-buttons slot="end"><ion-button fill="clear" (click)="cerrarCalendariosDispositivo()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <section class="settings-labels reminder-settings">
+          <h2>Calendarios del dispositivo</h2>
+          <p>Selecciona los calendarios que deseas ver en la agenda. Los eventos se muestran en modo de solo lectura.</p>
+          <div class="reminder-setting-row">
+            <span><strong>Mostrar eventos externos</strong><small>Usa los calendarios sincronizados por Android</small></span>
+            <ion-toggle
+              [checked]="deviceCalendarSettings.enabled"
+              aria-label="Mostrar eventos de los calendarios del dispositivo"
+              (ionChange)="setDeviceCalendarEnabled($event.detail.checked)"
+            ></ion-toggle>
+          </div>
+
+          @if (deviceCalendarStatus === 'loading') {
+          <p>Consultando calendarios…</p>
+          } @else if (deviceCalendarStatus === 'denied') {
+          <p>Se necesita permiso para leer el calendario del dispositivo.</p>
+          <ion-button expand="block" fill="outline" (click)="setDeviceCalendarEnabled(true)">Conceder permiso</ion-button>
+          } @else if (deviceCalendarStatus === 'unavailable') {
+          <p>Esta integración está disponible al ejecutar la aplicación en Android.</p>
+          } @else if (deviceCalendarStatus === 'error') {
+          <p>No fue posible consultar los calendarios. Puedes intentarlo nuevamente.</p>
+          }
+
+          @if (deviceCalendarSettings.enabled && deviceCalendarStatus === 'ready') {
+          <div class="reminder-label-list">
+            @for (calendar of deviceCalendars; track calendar.id) {
+            <article class="reminder-label-item">
+              <div class="reminder-setting-row">
+                <span>
+                  <strong><span class="label-dot" [style.--label-color]="calendar.color"></span>{{ calendar.name }}</strong>
+                  <small>{{ calendar.accountName }}{{ calendar.writable ? '' : ' · Solo lectura' }}</small>
+                </span>
+                <ion-toggle
+                  [checked]="isDeviceCalendarSelected(calendar.id)"
+                  [attr.aria-label]="'Mostrar calendario ' + calendar.name"
+                  (ionChange)="setDeviceCalendarSelected(calendar.id, $event.detail.checked)"
+                ></ion-toggle>
+              </div>
+            </article>
+            }
+            @if (deviceCalendars.length === 0) {
+            <p>No hay calendarios visibles y sincronizados en el dispositivo.</p>
+            }
+          </div>
+          <ion-button expand="block" fill="outline" (click)="refreshDeviceCalendars()">Actualizar calendarios</ion-button>
+          }
+        </section>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
 </ion-content>
+
+@if (!eventEditorOpen) {
+<ion-footer class="bottom-nav">
+  <nav aria-label="Navegacion principal">
+    <button
+      type="button"
+      [class.active]="selectedView === 'hoy'"
+      (click)="selectView('hoy')"
+    >
+      <ion-icon name="home-outline"></ion-icon>
+      <span>Hoy</span>
+    </button>
+    <button
+      type="button"
+      [class.active]="selectedView === 'calendario'"
+      (click)="selectView('calendario')"
+    >
+      <ion-icon name="calendar-outline"></ion-icon>
+      <span>Calendario</span>
+    </button>
+    <button
+      type="button"
+      [class.active]="selectedView === 'pendientes'"
+      (click)="selectView('pendientes')"
+    >
+      <ion-icon name="checkbox-outline"></ion-icon>
+      <span>Tareas</span>
+    </button>
+    <button
+      type="button"
+      [class.active]="selectedView === 'mas'"
+      (click)="selectView('mas')"
+    >
+      <ion-icon name="menu-outline"></ion-icon>
+      <span>Mas</span>
+    </button>
+  </nav>
+</ion-footer>
+}
+
+<ng-template #eventInlineActions let-tarea="tarea">
+  @if (isEventExpanded(tarea)) {
+  <span class="event-inline-actions" (click)="$event.stopPropagation()">
+    @if (!eventAction) {
+    <span class="event-icon-action" role="button" tabindex="0" aria-label="Editar evento" (click)="iniciarAccionEvento('edit')" (keydown.enter)="iniciarAccionEvento('edit')"><ion-icon name="pencil-outline"></ion-icon></span>
+    <span class="event-icon-action" role="button" tabindex="0" aria-label="Reagendar evento" (click)="iniciarAccionEvento('reschedule')" (keydown.enter)="iniciarAccionEvento('reschedule')"><ion-icon name="calendar-outline"></ion-icon></span>
+    <span class="event-icon-action danger" role="button" tabindex="0" aria-label="Cancelar evento" (click)="iniciarAccionEvento('cancel')" (keydown.enter)="iniciarAccionEvento('cancel')"><ion-icon name="close-circle-outline"></ion-icon></span>
+    } @else if (!confirmingEventCancellation) {
+    <span class="event-scope-picker">
+      <span role="button" tabindex="0" (click)="aplicarAccionEvento('one')" (keydown.enter)="aplicarAccionEvento('one')">Solo esta</span>
+      <span role="button" tabindex="0" (click)="aplicarAccionEvento('following')" (keydown.enter)="aplicarAccionEvento('following')">Esta y siguientes</span>
+      <span role="button" tabindex="0" (click)="aplicarAccionEvento('all')" (keydown.enter)="aplicarAccionEvento('all')">Toda la serie</span>
+    </span>
+    }
+  </span>
+  }
+</ng-template>
+
+<ion-alert
+  [isOpen]="eventCancelAlertOpen"
+  header="¿Cancelar evento?"
+  message="Esta acción quitará el evento del calendario."
+  [buttons]="eventCancelAlertButtons"
+  (didDismiss)="cerrarAlertaCancelacion()"
+></ion-alert>
+
+<ng-template #taskCard let-tarea="tarea" let-home="home">
+  @if (home) {
+  <article
+    class="home-task-card"
+    [class.expanded]="isTaskActionsExpanded(tarea)"
+    [class.expired]="tarea.estado === 'vencida'"
+    [class.done]="tarea.estado === 'completada'"
+    [class.priority-high]="tarea.prioridad === 'alta'"
+    [class.priority-medium]="tarea.prioridad === 'media'"
+    [class.priority-low]="tarea.prioridad === 'baja'"
+    [style.--priority]="tarea.tipo === 'evento' ? (tarea.color ?? '#2563eb') : null"
+    [style.--label-color]="labelColor(tarea.etiqueta)"
+  >
+    <div class="home-task-summary">
+      <ion-checkbox
+        [checked]="tarea.estado === 'completada'"
+        (click)="$event.stopPropagation()"
+        (ionChange)="cambiarEstado(tarea)"
+        [attr.aria-label]="(tarea.estado === 'completada' ? 'Marcar como pendiente ' : 'Completar ') + tarea.titulo"
+      ></ion-checkbox>
+
+      <div class="home-task-info">
+        <h3>{{ tarea.titulo }}</h3>
+        @if (tarea.hora || tarea.etiqueta) {
+        <div class="home-task-meta">
+          @if (tarea.hora) {
+          <span>{{ tarea.hora }} – {{ taskEndTime(tarea) }}</span>
+          }
+          @if (tarea.hora && tarea.etiqueta) {
+          <span aria-hidden="true">·</span>
+          }
+          @if (tarea.etiqueta) {
+          <span class="home-task-label"><i></i>{{ tarea.etiqueta }}</span>
+          }
+        </div>
+        }
+      </div>
+
+      <button
+        type="button"
+        class="task-expand-button"
+        [class.expanded]="isTaskActionsExpanded(tarea)"
+        [attr.aria-expanded]="isTaskActionsExpanded(tarea)"
+        [attr.aria-label]="(isTaskActionsExpanded(tarea) ? 'Ocultar acciones de ' : 'Mostrar acciones de ') + tarea.titulo"
+        (click)="toggleTaskActions(tarea)"
+      >
+        <ion-icon name="chevron-down-outline"></ion-icon>
+      </button>
+    </div>
+
+    @if (isTaskActionsExpanded(tarea)) {
+    <div class="home-task-actions">
+      @if (tarea.estado !== 'vencida') {
+      <button type="button" (click)="editTaskFromHome(tarea)" [attr.aria-label]="'Editar ' + tarea.titulo">
+        <ion-icon name="pencil-outline"></ion-icon><span>Editar</span>
+      </button>
+      }
+      <button type="button" (click)="rescheduleTaskFromHome(tarea)" [attr.aria-label]="'Reagendar ' + tarea.titulo">
+        <span class="reschedule-icon"><ion-icon name="calendar-outline"></ion-icon><ion-icon name="time-outline"></ion-icon></span><span>Reagendar</span>
+      </button>
+      <button type="button" class="discard-action" (click)="discardTaskFromHome(tarea)" [attr.aria-label]="'Descartar ' + tarea.titulo">
+        <ion-icon name="trash-outline"></ion-icon><span>Descartar</span>
+      </button>
+    </div>
+    }
+  </article>
+  } @else {
+  <article
+    class="task-card"
+    [class.done]="tarea.estado === 'completada'"
+    [class.expired]="tarea.estado === 'vencida'"
+    [class.priority-high]="tarea.prioridad === 'alta'"
+    [class.priority-medium]="tarea.prioridad === 'media'"
+    [class.priority-low]="tarea.prioridad === 'baja'"
+    [style.--label-color]="labelColor(tarea.etiqueta)"
+  >
+    <ion-checkbox
+      [checked]="tarea.estado === 'completada'"
+      (ionChange)="cambiarEstado(tarea)"
+      aria-label="Cambiar estado"
+    ></ion-checkbox>
+
+    <div class="task-main" (click)="editarTarea(tarea)">
+      <div class="task-title-row">
+        <h3>{{ tarea.titulo }}</h3>
+      </div>
+
+      @if (tarea.etiqueta || !tarea.hora) {
+      <div class="task-meta task-labels">
+        @if (tarea.etiqueta) {
+        <ion-chip>
+          <span class="chip-dot"></span>
+          {{ tarea.etiqueta }}
+        </ion-chip>
+        }
+        @if (!tarea.hora) {
+        <ion-button fill="clear" color="danger" aria-label="Eliminar" (click)="eliminarTarea(tarea)">
+          <ion-icon name="trash-outline"></ion-icon>
+        </ion-button>
+        }
+      </div>
+      }
+
+      @if (tarea.hora) {
+      <div class="task-footer">
+        <div class="task-meta task-time">
+          <span>{{ tarea.hora }} – {{ taskEndTime(tarea) }}</span>
+        </div>
+        <ion-button
+          fill="clear"
+          color="danger"
+          aria-label="Eliminar"
+          (click)="eliminarTarea(tarea)"
+        >
+          <ion-icon name="trash-outline"></ion-icon>
+        </ion-button>
+      </div>
+      }
+
+      @if (tarea.estado === 'vencida') {
+      <div class="task-actions">
+        <ion-button fill="outline" size="small" (click)="ignorarTarea(tarea)">
+          Descartar
+        </ion-button>
+        <ion-button size="small" (click)="prepararReagenda(tarea)">
+          Reagendar
+        </ion-button>
+      </div>
+      }
+    </div>
+
+  </article>
+  }
+</ng-template>
