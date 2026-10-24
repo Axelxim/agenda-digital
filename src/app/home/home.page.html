@@ -1,4 +1,4 @@
-<ion-header class="app-header" [class.editor-open]="eventEditorOpen" [translucent]="true">
+<ion-header class="app-header" [class.editor-open]="eventEditorOpen || birthdayEditorOpen" [translucent]="true">
   <ion-toolbar>
     <ion-title>{{ titulo }}</ion-title>
     <ion-buttons slot="end">
@@ -399,7 +399,46 @@
   </section>
   }
 
-  @if (selectedView === 'hoy') {
+  @if (birthdayEditorOpen) {
+  <section class="event-editor-screen" aria-label="Nuevo cumpleaños">
+    <div class="event-editor-panel birthday-editor-panel">
+      <header class="event-editor-header">
+        <button type="button" aria-label="Regresar" (click)="cerrarEditorCumpleanos()"><ion-icon name="chevron-back-outline"></ion-icon></button>
+        <h1>Nuevo cumpleaños</h1>
+        <button type="button" class="editor-save" [disabled]="!birthdayNameValue.trim() || !birthdayDate" (click)="guardarCumpleanos()">Guardar</button>
+      </header>
+
+      <div class="event-editor-content">
+        <label class="editor-field editor-title-field">
+          <span class="editor-label">Nombre</span>
+          <ion-input placeholder="Nombre de la persona" [(ngModel)]="birthdayNameValue"></ion-input>
+        </label>
+
+        <label class="editor-field">
+          <span class="editor-label">Fecha</span>
+          <ion-icon name="calendar-outline"></ion-icon>
+          <ion-input type="date" [(ngModel)]="birthdayDate"></ion-input>
+        </label>
+
+        <button type="button" class="editor-field editor-repeat" (click)="birthdayRepeatExpanded = !birthdayRepeatExpanded" [attr.aria-expanded]="birthdayRepeatExpanded">
+          <ion-icon name="repeat-outline"></ion-icon>
+          <span>Repetir</span>
+          <small>{{ birthdayRepeatsYearly ? 'Cada año' : 'Nunca' }}</small>
+        </button>
+        @if (birthdayRepeatExpanded) {
+        <div class="repeat-options" role="group" aria-label="Repetición del cumpleaños">
+          <button type="button" [class.selected]="!birthdayRepeatsYearly" (click)="birthdayRepeatsYearly = false; birthdayRepeatExpanded = false">Nunca</button>
+          <button type="button" [class.selected]="birthdayRepeatsYearly" (click)="birthdayRepeatsYearly = true; birthdayRepeatExpanded = false">Cada año</button>
+        </div>
+        }
+
+        @if (birthdaySaveError) { <p class="time-validation">{{ birthdaySaveError }}</p> }
+      </div>
+    </div>
+  </section>
+  }
+
+  @if (selectedView === 'hoy' && !eventEditorOpen && !birthdayEditorOpen) {
   <ion-fab slot="fixed" vertical="bottom" horizontal="end" class="today-fab">
     <ion-fab-button aria-label="Crear">
       <ion-icon name="add"></ion-icon>
@@ -407,6 +446,7 @@
     <ion-fab-list side="top">
       <ion-fab-button aria-label="Crear tarea" (click)="nuevaTarea()"><ion-icon name="checkbox-outline"></ion-icon></ion-fab-button>
       <ion-fab-button aria-label="Crear evento" (click)="nuevoEvento()"><ion-icon name="calendar-outline"></ion-icon></ion-fab-button>
+      <ion-fab-button aria-label="Crear cumpleaños" (click)="nuevoCumpleanos()"><ion-icon name="gift-outline"></ion-icon></ion-fab-button>
     </ion-fab-list>
   </ion-fab>
   }

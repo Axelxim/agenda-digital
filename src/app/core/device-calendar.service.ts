@@ -83,7 +83,7 @@ interface DeviceCalendarPlugin {
     date: string;
     startTime?: string;
     endTime?: string;
-    recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
+    recurrence: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   }): Promise<{ eventId: string }>;
   startObserving(): Promise<void>;
   addListener(eventName: 'calendarChanged', listener: () => void): Promise<PluginListenerHandle>;
@@ -221,7 +221,7 @@ export class DeviceCalendarService {
     date: string;
     startTime?: string;
     endTime?: string;
-    recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
+    recurrence: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   }): Promise<string> {
     await this.requireWritePermission();
     const result = await DeviceCalendarNative.createEvent(options);

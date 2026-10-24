@@ -371,6 +371,7 @@ public class DeviceCalendarPlugin extends Plugin {
             case "daily": return "FREQ=DAILY";
             case "weekly": return "FREQ=WEEKLY";
             case "monthly": return "FREQ=MONTHLY";
+            case "yearly": return "FREQ=YEARLY";
             default: return null;
         }
     }
