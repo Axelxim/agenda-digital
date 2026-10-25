@@ -51,6 +51,14 @@ export class WalletService {
     };
   }
 
+  replaceFromSync(state: WalletState): WalletState {
+    this.state = this.normalizeState(state);
+    this.persistLocal();
+    void this.storage.saveWallet(this.state);
+    this.emit();
+    return this.getState();
+  }
+
   saveSettings(settings: WalletSettings): WalletState {
     this.state.settings = this.normalizeSettings(settings);
     this.persist();

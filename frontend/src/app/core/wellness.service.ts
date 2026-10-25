@@ -82,6 +82,23 @@ export class WellnessService {
     }));
   }
 
+  replaceFromSync(
+    settings: WellnessSettings,
+    treatments: MedicationTreatment[],
+    doses: MedicationDose[],
+  ): MedicationTreatment[] {
+    const normalizedSettings = { enabled: settings.enabled === true };
+    this.treatments = treatments.map((item) => this.normalize(item));
+    this.doses = doses.map((item) => this.normalizeDose(item));
+    localStorage.setItem(this.settingsKey, JSON.stringify(normalizedSettings));
+    localStorage.setItem(this.treatmentsKey, JSON.stringify(this.treatments));
+    localStorage.setItem(this.dosesKey, JSON.stringify(this.doses));
+    void this.agendaStorage.saveTreatments(this.treatments);
+    void this.agendaStorage.saveMedicationDoses(this.doses);
+    this.emitChanges(normalizedSettings);
+    return this.getTreatments();
+  }
+
   saveTreatment(draft: MedicationTreatmentDraft, id?: string): MedicationTreatment[] {
     const now = new Date().toISOString();
     const existing = id ? this.treatments.find((item) => item.id === id) : undefined;

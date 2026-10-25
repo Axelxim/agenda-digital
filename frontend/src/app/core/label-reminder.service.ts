@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { Subject } from 'rxjs';
 
 import {
   CalculatedLabelReminder,
@@ -11,6 +12,8 @@ import {
 @Injectable({ providedIn: 'root' })
 export class LabelReminderService {
   private readonly storageKey = 'agenda_label_reminders_v1';
+  private readonly changesSubject = new Subject<Record<TaskLabel, LabelReminderSettings>>();
+  readonly changes$ = this.changesSubject.asObservable();
 
   readonly leadOptions: ReadonlyArray<{ minutes: ReminderLeadMinutes; label: string }> = [
     { minutes: 10080, label: '1 semana' },
@@ -41,6 +44,12 @@ export class LabelReminderService {
 
   save(settings: Record<TaskLabel, LabelReminderSettings>): void {
     localStorage.setItem(this.storageKey, JSON.stringify(settings));
+    this.changesSubject.next(settings);
+  }
+
+  replaceFromSync(settings: Record<TaskLabel, LabelReminderSettings>): void {
+    localStorage.setItem(this.storageKey, JSON.stringify(settings));
+    this.changesSubject.next(settings);
   }
 
   defaultSettings(label: TaskLabel): LabelReminderSettings {

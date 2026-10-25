@@ -107,6 +107,7 @@ import { FixedExpense, FixedExpenseOccurrence, WalletState, WalletTransactionKin
 import { WalletService } from '../core/wallet.service';
 import { AuthService } from '../core/auth.service';
 import { AgendaSyncService } from '../core/agenda-sync.service';
+import { PersonalDataSyncService } from '../core/personal-data-sync.service';
 import {
   GoogleCalendarConnection,
   GoogleCalendarItem,
@@ -228,6 +229,7 @@ interface TimedEventLayout {
 export class HomePage implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
   readonly agendaSync = inject(AgendaSyncService);
+  private readonly personalDataSync = inject(PersonalDataSyncService);
   private readonly taskService = inject(TaskService);
   private readonly labelReminderService = inject(LabelReminderService);
   private readonly notificationScheduler = inject(NotificationSchedulerService);
@@ -529,20 +531,25 @@ export class HomePage implements OnInit, OnDestroy {
     this.medicationTreatments = this.wellnessService.loadTreatments();
     this.quickNotes = this.noteService.load();
     this.walletState = this.walletService.load();
-    void this.walletService.initializePersistence().then((state) => {
+    const walletReady = this.walletService.initializePersistence().then((state) => {
       this.walletState = state;
       this.syncNotifications();
       this.refreshView();
     });
-    void this.noteService.initializePersistence().then((notes) => {
+    const notesReady = this.noteService.initializePersistence().then((notes) => {
       this.quickNotes = notes;
       this.refreshView();
     });
-    void this.wellnessService.initializePersistence().then((treatments) => {
+    const wellnessReady = this.wellnessService.initializePersistence().then((treatments) => {
       this.medicationTreatments = treatments;
       this.medicationDoses = this.wellnessService.getDoses();
       this.buildCalendar();
       this.syncNotifications();
+      this.refreshView();
+    });
+    void Promise.all([walletReady, notesReady, wellnessReady]).then(async () => {
+      await this.personalDataSync.start();
+      this.advancedModeEnabled = localStorage.getItem(this.advancedModeKey) === 'true';
       this.refreshView();
     });
     void this.taskService.initializePersistence().then(({ tasks, presets }) => {
@@ -634,6 +641,13 @@ export class HomePage implements OnInit, OnDestroy {
     this.liveStateSubscriptions.add(
       this.noteService.changes$.subscribe((notes) => {
         this.quickNotes = notes;
+        this.refreshView();
+      }),
+    );
+    this.liveStateSubscriptions.add(
+      this.labelReminderService.changes$.subscribe((settings) => {
+        this.labelReminderSettings = settings;
+        this.syncNotifications();
         this.refreshView();
       }),
     );
@@ -1015,6 +1029,8 @@ export class HomePage implements OnInit, OnDestroy {
       this.medicationTreatments = await this.wellnessService.initializePersistence();
       this.medicationDoses = this.wellnessService.getDoses();
       this.quickNotes = await this.noteService.initializePersistence();
+      this.walletState = await this.walletService.initializePersistence();
+      await this.personalDataSync.syncNow();
       this.setTasks(this.taskService.refreshExpired(this.currentTime));
       await Promise.all([
         this.refreshDeviceCalendarEvents(),
@@ -1817,6 +1833,7 @@ export class HomePage implements OnInit, OnDestroy {
   setAdvancedModeEnabled(enabled: boolean): void {
     this.advancedModeEnabled = enabled;
     localStorage.setItem(this.advancedModeKey, String(enabled));
+    this.personalDataSync.uploadNow();
   }
 
   get globalSearchResults(): GlobalSearchResult[] {

@@ -24,10 +24,21 @@ $routes->group('api/v1', static function (RouteCollection $routes): void {
     });
 
     $routes->group('', ['filter' => 'tokens'], static function (RouteCollection $routes): void {
-        $routes->get('agenda', 'Api\\AgendaController::listar');
-        $routes->post('agenda/sincronizar', 'Api\\AgendaController::sincronizar');
-        $routes->get('rutinas', 'Api\\RutinasController::listar');
-        $routes->post('rutinas/sincronizar', 'Api\\RutinasController::sincronizar');
+        $routes->get('agenda', 'Api\\AgendaController::listar', ['filter' => 'scope:sync']);
+        $routes->post('agenda/sincronizar', 'Api\\AgendaController::sincronizar', ['filter' => 'scope:sync']);
+        $routes->get('rutinas', 'Api\\RutinasController::listar', ['filter' => 'scope:sync']);
+        $routes->post('rutinas/sincronizar', 'Api\\RutinasController::sincronizar', ['filter' => 'scope:sync']);
+        $routes->get('datos-personales', 'Api\\DatosPersonalesController::listar', ['filter' => 'scope:sync']);
+        $routes->put('datos-personales', 'Api\\DatosPersonalesController::sincronizar', ['filter' => 'scope:sync']);
+        $routes->get('bienestar/tratamientos', 'Api\\BienestarController::tratamientos', ['filter' => 'scope:sync']);
+        $routes->get('bienestar/tomas', 'Api\\BienestarController::tomas', ['filter' => 'scope:sync']);
+        $routes->put('bienestar/sincronizar', 'Api\\BienestarController::sincronizar', ['filter' => 'scope:sync']);
+        $routes->get('notas', 'Api\\NotasController::listar', ['filter' => 'scope:sync']);
+        $routes->put('notas/sincronizar', 'Api\\NotasController::sincronizar', ['filter' => 'scope:sync']);
+        $routes->get('billetera', 'Api\\BilleteraController::listar', ['filter' => 'scope:sync']);
+        $routes->put('billetera/sincronizar', 'Api\\BilleteraController::sincronizar', ['filter' => 'scope:sync']);
+        $routes->get('preferencias', 'Api\\PreferenciasController::listar', ['filter' => 'scope:sync']);
+        $routes->put('preferencias', 'Api\\PreferenciasController::actualizar', ['filter' => 'scope:sync']);
         $routes->get('integraciones/google-calendar/estado', 'Api\\GoogleCalendarController::estado');
         $routes->post('integraciones/google-calendar/autorizar', 'Api\\GoogleCalendarController::autorizar');
         $routes->get('integraciones/google-calendar/calendarios', 'Api\\GoogleCalendarController::calendarios');

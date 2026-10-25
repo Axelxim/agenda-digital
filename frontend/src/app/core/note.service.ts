@@ -66,6 +66,14 @@ export class NoteService {
     return this.getAll();
   }
 
+  replaceFromSync(notes: QuickNote[]): QuickNote[] {
+    this.notes = notes.map((note) => this.normalize(note));
+    this.persistLocal();
+    void this.agendaStorage.saveNotes(this.notes);
+    this.changesSubject.next(this.getAll());
+    return this.getAll();
+  }
+
   private normalize(note: Partial<QuickNote>): QuickNote {
     const now = new Date().toISOString();
     return {
