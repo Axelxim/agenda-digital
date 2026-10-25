@@ -1,0 +1,26 @@
+<ion-content [fullscreen]="true" class="sync-content">
+  <main class="sync-shell">
+    <section class="sync-card" aria-labelledby="sync-title">
+      <div class="sync-mark" aria-hidden="true"><ion-icon name="cloud-done-outline"></ion-icon></div>
+      <p class="eyebrow">Tu cuenta está lista</p>
+      <h1 id="sync-title">¿Quieres sincronizar tu agenda?</h1>
+      <p class="description">Guarda una copia de tus tareas, eventos y rutinas para recuperarlas en otros dispositivos.</p>
+
+      <div class="sync-benefits">
+        <span><ion-icon name="checkmark-circle-outline"></ion-icon> Los cambios se guardarán automáticamente</span>
+        <span><ion-icon name="checkmark-circle-outline"></ion-icon> Si ya tienes información, se combinará sin borrarla</span>
+        <span><ion-icon name="shield-checkmark-outline"></ion-icon> Puedes desactivarlo después en Configuración</span>
+      </div>
+
+      <ion-button expand="block" class="sync-button" (click)="enableSync()">
+        <ion-icon slot="start" name="cloud-done-outline"></ion-icon>
+        Activar sincronización
+      </ion-button>
+      <ion-button expand="block" fill="clear" class="local-button" (click)="keepLocal()">
+        <ion-icon slot="start" name="phone-portrait-outline"></ion-icon>
+        Continuar solo en este dispositivo
+      </ion-button>
+      <small>Ninguna opción elimina la información que ya tienes.</small>
+    </section>
+  </main>
+</ion-content>

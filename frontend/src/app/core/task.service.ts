@@ -51,6 +51,8 @@ export class TaskService {
   private tareas: Task[] = [];
   private readonly changesSubject = new Subject<Task[]>();
   readonly changes$ = this.changesSubject.asObservable();
+  private readonly presetsChangesSubject = new Subject<EventPreset[]>();
+  readonly presetsChanges$ = this.presetsChangesSubject.asObservable();
 
   load(): Task[] {
     const datos = localStorage.getItem(this.storageKey);
@@ -108,18 +110,32 @@ export class TaskService {
 
   saveEventPreset(preset: Omit<EventPreset, 'id'>): EventPreset[] {
     const presets = this.loadEventPresets();
-    const next = [...presets, { ...preset, id: Date.now() }];
+    const next = [...presets, {
+      ...preset,
+      id: Date.now(),
+      uuid: preset.uuid ?? this.createUuid(),
+      serverVersion: preset.serverVersion ?? 0,
+      syncStatus: 'pending' as const,
+      updatedAt: new Date().toISOString(),
+    }];
     localStorage.setItem(this.presetsStorageKey, JSON.stringify(next));
     void this.agendaStorage.savePresets(next);
+    this.presetsChangesSubject.next(next);
     return next;
   }
 
   updateEventPreset(preset: EventPreset): EventPreset[] {
-    const next = this.loadEventPresets().map((item) =>
-      item.id === preset.id ? preset : item,
-    );
+    const next = this.loadEventPresets().map((item) => item.id === preset.id ? {
+      ...preset,
+      uuid: item.uuid ?? preset.uuid ?? this.createUuid(),
+      serverId: item.serverId ?? preset.serverId,
+      serverVersion: item.serverVersion ?? preset.serverVersion ?? 0,
+      syncStatus: 'pending' as const,
+      updatedAt: new Date().toISOString(),
+    } : item);
     localStorage.setItem(this.presetsStorageKey, JSON.stringify(next));
     void this.agendaStorage.savePresets(next);
+    this.presetsChangesSubject.next(next);
 
     this.tareas = this.tareas.flatMap((tarea) => {
       const matchesPreset =
@@ -154,6 +170,22 @@ export class TaskService {
     });
     this.save();
     return next;
+  }
+
+  replaceFromSync(tasks: Task[]): Task[] {
+    this.tareas = this.sortTasks(tasks.map((task) => this.normalizeTask(task)));
+    localStorage.setItem(this.storageKey, JSON.stringify(this.tareas));
+    void this.agendaStorage.saveTasks(this.tareas);
+    this.changesSubject.next(this.getAll());
+    return this.getAll();
+  }
+
+  replaceEventPresetsFromSync(presets: EventPreset[]): EventPreset[] {
+    const normalized = this.normalizePresets(presets);
+    localStorage.setItem(this.presetsStorageKey, JSON.stringify(normalized));
+    void this.agendaStorage.savePresets(normalized);
+    this.presetsChangesSubject.next(normalized);
+    return normalized;
   }
 
   createPresetEvents(preset: EventPreset, dates: string[]): Task[] {
@@ -852,6 +884,10 @@ export class TaskService {
     return {
       id,
       uuid: typeof task.uuid === 'string' && task.uuid ? task.uuid : this.createUuid(),
+      serverId: typeof task.serverId === 'string' && task.serverId ? task.serverId : undefined,
+      serverVersion: typeof task.serverVersion === 'number' && task.serverVersion >= 0
+        ? task.serverVersion
+        : 0,
       titulo: typeof task.titulo === 'string' ? task.titulo : 'Tarea sin titulo',
       tipo,
       fecha: this.cleanOptional(task.fecha),
@@ -894,7 +930,13 @@ export class TaskService {
         let id = typeof subtask.id === 'string' && subtask.id ? subtask.id : this.createUuid();
         while (ids.has(id)) id = this.createUuid();
         ids.add(id);
-        return { id, title: subtask.title.trim(), completed: subtask.completed === true };
+        return {
+          id,
+          title: subtask.title.trim(),
+          completed: subtask.completed === true,
+          serverId: typeof subtask.serverId === 'string' ? subtask.serverId : undefined,
+          serverVersion: typeof subtask.serverVersion === 'number' ? subtask.serverVersion : 0,
+        };
       });
     return normalized.length ? normalized : undefined;
   }
@@ -902,6 +944,15 @@ export class TaskService {
   private normalizePresets(presets: Partial<EventPreset>[]): EventPreset[] {
     return presets.filter((preset) => typeof preset.nombre === 'string').map((preset) => ({
       id: typeof preset.id === 'number' ? preset.id : Date.now(),
+      uuid: typeof preset.uuid === 'string' && preset.uuid ? preset.uuid : this.createUuid(),
+      serverId: typeof preset.serverId === 'string' && preset.serverId ? preset.serverId : undefined,
+      serverVersion: typeof preset.serverVersion === 'number' && preset.serverVersion >= 0
+        ? preset.serverVersion
+        : 0,
+      syncStatus: preset.syncStatus === 'synced' || preset.syncStatus === 'conflict'
+        ? preset.syncStatus
+        : 'pending',
+      updatedAt: typeof preset.updatedAt === 'string' ? preset.updatedAt : new Date().toISOString(),
       nombre: preset.nombre?.trim() || 'Evento',
       color: typeof preset.color === 'string' ? preset.color : '#2563eb',
       horaInicio: typeof preset.horaInicio === 'string' ? preset.horaInicio : '09:00',
@@ -939,6 +990,10 @@ export class TaskService {
       return {
         ...current,
         uuid: typeof old.uuid === 'string' && old.uuid ? old.uuid : current.uuid,
+        serverId: typeof old.serverId === 'string' ? old.serverId : current.serverId,
+        serverVersion: typeof old.serverVersion === 'number'
+          ? old.serverVersion
+          : current.serverVersion,
         createdAt: typeof old.createdAt === 'string' ? old.createdAt : current.createdAt,
         updatedAt: changed ? now : current.updatedAt,
         version: changed ? Math.max(current.version ?? 1, old.version ?? 1) + 1 : current.version,
@@ -948,8 +1003,20 @@ export class TaskService {
   }
 
   private taskPayload(task: Partial<Task>): string {
-    const { uuid: _uuid, createdAt: _createdAt, updatedAt: _updatedAt, version: _version, syncStatus: _syncStatus, ...payload } = task;
-    return JSON.stringify(payload);
+    const {
+      uuid: _uuid,
+      serverId: _serverId,
+      serverVersion: _serverVersion,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      version: _version,
+      syncStatus: _syncStatus,
+      ...payload
+    } = task;
+    return JSON.stringify({
+      ...payload,
+      subtasks: payload.subtasks?.map(({ serverId: _subtaskServerId, serverVersion: _subtaskServerVersion, ...subtask }) => subtask),
+    });
   }
 
   private createUuid(): string {

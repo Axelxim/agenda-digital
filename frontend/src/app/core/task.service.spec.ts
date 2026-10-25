@@ -127,4 +127,52 @@ describe('TaskService', () => {
     expect(tasks.find((task) => task.id === 99)?.estado).toBe('vencida');
     expect(tasks.some((task) => task.fecha === '2026-10-25' && task.estado === 'pendiente')).toBe(true);
   });
+
+  it('preserves the server version and marks a remotely stored task as pending after an edit', () => {
+    service.replaceFromSync([{
+      ...service.getAll()[0],
+      uuid: 'task-cloud-1',
+      serverId: 'server-task-1',
+      serverVersion: 7,
+      syncStatus: 'synced',
+    }]);
+
+    const updated = service.update(99, {
+      titulo: 'Entrega editada',
+      tipo: 'tarea',
+      fecha: '2026-10-25',
+      hora: '10:00',
+      horaFin: '11:00',
+      prioridad: 'media',
+      repeticion: 'daily',
+    })[0];
+
+    expect(updated.serverVersion).toBe(7);
+    expect(updated.syncStatus).toBe('pending');
+  });
+
+  it('adds synchronization metadata to routines and preserves it when editing', () => {
+    const created = service.saveEventPreset({
+      nombre: 'Ejercicio',
+      color: '#2563eb',
+      horaInicio: '07:00',
+      horaFin: '08:00',
+      dias: [1, 3, 5],
+    })[0];
+
+    expect(created.uuid).toBeTruthy();
+    expect(created.syncStatus).toBe('pending');
+
+    service.replaceEventPresetsFromSync([{
+      ...created,
+      serverId: 'server-routine-1',
+      serverVersion: 3,
+      syncStatus: 'synced',
+    }]);
+    const updated = service.updateEventPreset({ ...created, nombre: 'Ejercicio diario' })[0];
+
+    expect(updated.serverId).toBe('server-routine-1');
+    expect(updated.serverVersion).toBe(3);
+    expect(updated.syncStatus).toBe('pending');
+  });
 });

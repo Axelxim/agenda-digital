@@ -221,6 +221,7 @@ final class AuthController extends BaseController
                     'user_id' => $usuario->id,
                     'uuid' => Uuid::v4(),
                     'display_name' => mb_substr($nombre, 0, 100),
+                    'avatar_url' => $this->googleAvatarUrl($payload),
                     'locale' => 'es-MX',
                     'timezone' => 'America/Mexico_City',
                 ]);
@@ -235,7 +236,12 @@ final class AuthController extends BaseController
             if (! $usuario instanceof User) {
                 throw new \RuntimeException('La cuenta vinculada ya no existe.');
             }
-            $perfil = (new UserProfileModel())->find($usuario->id);
+            $perfiles = new UserProfileModel();
+            $fotoGoogle = $this->googleAvatarUrl($payload);
+            if ($fotoGoogle !== null) {
+                $perfiles->update($usuario->id, ['avatar_url' => $fotoGoogle]);
+            }
+            $perfil = $perfiles->find($usuario->id);
             if (! is_array($perfil)) {
                 throw new \RuntimeException('La cuenta de Google no tiene un perfil valido.');
             }
@@ -368,6 +374,7 @@ final class AuthController extends BaseController
             'id'       => $profile['uuid'] ?? null,
             'name'     => $profile['display_name'] ?? '',
             'email'    => $user->email,
+            'avatarUrl' => $profile['avatar_url'] ?? null,
             'locale'   => $profile['locale'] ?? 'es-MX',
             'timezone' => $profile['timezone'] ?? 'America/Mexico_City',
         ];
@@ -380,5 +387,12 @@ final class AuthController extends BaseController
         return preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches) === 1
             ? trim($matches[1])
             : '';
+    }
+
+    private function googleAvatarUrl(array $payload): ?string
+    {
+        $url = trim((string) ($payload['picture'] ?? ''));
+
+        return $url !== '' ? mb_substr($url, 0, 500) : null;
     }
 }

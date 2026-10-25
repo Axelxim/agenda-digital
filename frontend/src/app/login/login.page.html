@@ -1,0 +1,49 @@
+<ion-content [fullscreen]="true" class="login-content">
+  <main class="login-shell">
+    <section class="login-card" aria-labelledby="login-title">
+      <div class="brand-mark" aria-hidden="true">
+        <ion-icon name="calendar-outline"></ion-icon>
+      </div>
+
+      <header>
+        <p class="eyebrow">Todo en Orden</p>
+        <h1 id="login-title">Tu agenda, en todos tus dispositivos</h1>
+        <p>Inicia sesión para respaldar y sincronizar tus tareas, eventos, rutinas y tratamientos.</p>
+      </header>
+
+      <div class="benefits" aria-label="Beneficios de iniciar sesión">
+        <span><ion-icon name="shield-checkmark-outline"></ion-icon> Tus datos siguen siendo privados</span>
+        <span><ion-icon name="shield-checkmark-outline"></ion-icon> Recupera tu agenda al cambiar de equipo</span>
+      </div>
+
+      <div class="google-area">
+        @if (loading) {
+          <div class="google-loading"><ion-spinner name="crescent"></ion-spinner><span>Cargando acceso seguro…</span></div>
+        }
+        <div #googleButton class="google-button" [class.hidden]="loading || signingIn"></div>
+        @if (signingIn) {
+          <div class="google-loading"><ion-spinner name="crescent"></ion-spinner><span>Verificando tu cuenta…</span></div>
+        }
+      </div>
+
+      @if (rememberedAccount && !loading && !signingIn) {
+        <button type="button" class="change-account" (click)="useAnotherAccount()">
+          Usar otra cuenta
+        </button>
+      }
+
+      @if (errorMessage) {
+        <p class="login-error" role="alert">{{ errorMessage }}</p>
+      }
+
+      <div class="separator"><span>o</span></div>
+
+      <ion-button fill="clear" expand="block" class="local-button" (click)="continueLocally()">
+        <ion-icon slot="start" name="cloud-offline-outline"></ion-icon>
+        Continuar solo en este dispositivo
+      </ion-button>
+
+      <p class="local-note">Puedes vincular una cuenta más adelante. Tu información local no se eliminará.</p>
+    </section>
+  </main>
+</ion-content>

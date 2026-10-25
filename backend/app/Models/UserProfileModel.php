@@ -16,6 +16,7 @@ final class UserProfileModel extends Model
         'user_id',
         'uuid',
         'display_name',
+        'avatar_url',
         'locale',
         'timezone',
     ];

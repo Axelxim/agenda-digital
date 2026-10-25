@@ -7,6 +7,23 @@
   </ion-header>
   <ion-content>
     <nav class="settings-side-nav" aria-label="Configuración de la aplicación">
+      <section class="settings-profile" aria-label="Perfil">
+        <div class="settings-profile-avatar">
+          @if (auth.user()?.avatarUrl && !profileImageFailed) {
+          <img [src]="auth.user()?.avatarUrl" alt="Foto de perfil" referrerpolicy="no-referrer" (error)="markProfileImageAsFailed()">
+          } @else {
+          <span>{{ profileInitial }}</span>
+          }
+        </div>
+        <div class="settings-profile-copy">
+          <strong>{{ auth.user()?.name || 'Modo local' }}</strong>
+          <small>{{ auth.user()?.email || 'Datos guardados en este dispositivo' }}</small>
+          <em>{{ auth.isAuthenticated() ? agendaSync.statusLabel() : 'Sin sincronización' }}</em>
+        </div>
+        <button type="button" class="settings-profile-action" (click)="openAccount()">
+          {{ auth.isAuthenticated() ? 'Cerrar sesión' : 'Iniciar sesión' }}
+        </button>
+      </section>
       <p>Dispositivo</p>
       <button type="button" (click)="abrirAlarmasDesdePanel()">
         <span class="settings-side-icon alarm"><ion-icon name="battery-charging-outline"></ion-icon></span>
@@ -16,11 +33,18 @@
       </button>
       <button type="button" (click)="abrirCalendariosDesdePanel()">
         <span class="settings-side-icon calendar"><ion-icon name="calendar-outline"></ion-icon></span>
-        <span><strong>Calendarios del dispositivo</strong><small>{{ deviceCalendarSettings.enabled ? deviceCalendarSettings.selectedCalendarIds.length + ' seleccionados' : 'Desactivados' }}</small></span>
-        <span class="settings-side-state">{{ deviceCalendarSettings.enabled ? 'Activo' : 'Inactivo' }}</span>
+        <span><strong>Calendarios externos</strong><small>{{ googleCalendarConnection.connected ? 'Google Calendar conectado' : (deviceCalendarSettings.enabled ? deviceCalendarSettings.selectedCalendarIds.length + ' del dispositivo' : 'Configurar') }}</small></span>
+        <span class="settings-side-state">{{ googleCalendarConnection.connected || deviceCalendarSettings.enabled ? 'Activo' : 'Inactivo' }}</span>
         <ion-icon name="chevron-forward-outline"></ion-icon>
       </button>
       <p>Experiencia</p>
+      @if (auth.isAuthenticated()) {
+      <div class="settings-side-toggle">
+        <span class="settings-side-icon"><ion-icon name="cloud-outline"></ion-icon></span>
+        <span><strong>Sincronización</strong><small>{{ agendaSync.enabled() ? 'Respaldo automático activo' : 'Solo en este dispositivo' }}</small></span>
+        <ion-toggle [checked]="agendaSync.enabled()" aria-label="Activar sincronización" (ionChange)="setSyncEnabled($event.detail.checked)"></ion-toggle>
+      </div>
+      }
       <div class="settings-side-toggle">
         <span class="settings-side-icon"><ion-icon name="checkbox-outline"></ion-icon></span>
         <span><strong>Modo avanzado</strong><small>Subtareas y planificación detallada</small></span>
@@ -425,6 +449,15 @@
     @if (selectedView === 'mas') {
     <section class="more-view">
       <h1>Más</h1>
+      <button type="button" class="preset-entry" (click)="openAccount()">
+        <span class="preset-entry-icon"><ion-icon [name]="auth.isAuthenticated() ? 'log-out-outline' : 'person-circle-outline'"></ion-icon></span>
+        @if (auth.isAuthenticated()) {
+        <span><strong>{{ auth.user()?.name || 'Mi cuenta' }}</strong><small>{{ auth.user()?.email }} · Cerrar sesión</small></span>
+        } @else {
+        <span><strong>Cuenta y sincronización</strong><small>Modo local · Inicia sesión para respaldar tus datos</small></span>
+        }
+        <ion-icon name="chevron-forward-outline"></ion-icon>
+      </button>
       <button type="button" class="preset-entry" (click)="abrirBuscadorGlobal()">
         <span class="preset-entry-icon"><ion-icon name="search-outline"></ion-icon></span>
         <span><strong>Buscar en Agenda</strong><small>Tareas, eventos, cumpleaños y tratamientos</small></span>
@@ -1344,6 +1377,52 @@
       </ion-header>
       <ion-content class="modal-content">
         <section class="settings-labels reminder-settings">
+          <h2>Google Calendar</h2>
+          <p>Consulta tus calendarios de Google en cualquier dispositivo. Los eventos se muestran en modo de solo lectura.</p>
+
+          @if (!auth.isAuthenticated()) {
+          <p>Inicia sesión con Google para conectar tu calendario.</p>
+          } @else if (googleCalendarStatus === 'loading') {
+          <p>Consultando Google Calendar…</p>
+          } @else if (!googleCalendarConnection.connected) {
+          <div class="external-calendar-connect">
+            <span class="external-calendar-logo">G</span>
+            <span><strong>Conectar Google Calendar</strong><small>Elegirás qué calendarios deseas mostrar</small></span>
+          </div>
+          <ion-button expand="block" (click)="connectGoogleCalendar()">Conectar con Google</ion-button>
+          } @else {
+          <div class="external-calendar-connected">
+            <span><strong>Google Calendar conectado</strong><small>{{ googleCalendars.length }} calendarios disponibles</small></span>
+            <span class="settings-side-state">Activo</span>
+          </div>
+          <div class="reminder-label-list">
+            @for (calendar of googleCalendars; track calendar.id) {
+            <article class="reminder-label-item">
+              <div class="reminder-setting-row">
+                <span>
+                  <strong><span class="label-dot" [style.--label-color]="calendar.color"></span>{{ calendar.name }}</strong>
+                  <small>{{ calendar.primary ? 'Principal' : 'Google Calendar' }} · Solo lectura</small>
+                </span>
+                <ion-toggle
+                  [checked]="isGoogleCalendarSelected(calendar.id)"
+                  [attr.aria-label]="'Mostrar calendario de Google ' + calendar.name"
+                  (ionChange)="setGoogleCalendarSelected(calendar.id, $event.detail.checked)"
+                ></ion-toggle>
+              </div>
+            </article>
+            }
+          </div>
+          <div class="external-calendar-actions">
+            <ion-button expand="block" fill="outline" (click)="refreshGoogleCalendar(true)">Actualizar</ion-button>
+            <ion-button expand="block" fill="clear" color="danger" (click)="disconnectGoogleCalendar()">Desconectar</ion-button>
+          </div>
+          }
+
+          @if (googleCalendarMessage) {
+          <p class="calendar-integration-message" [class.error]="googleCalendarStatus === 'error'">{{ googleCalendarMessage }}</p>
+          }
+
+          <div class="calendar-integration-divider"></div>
           <h2>Calendarios del dispositivo</h2>
           <p>Selecciona los calendarios que deseas ver en la agenda. Los eventos se muestran en modo de solo lectura.</p>
           <div class="reminder-setting-row">

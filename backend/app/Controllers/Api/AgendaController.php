@@ -277,6 +277,7 @@ final class AgendaController extends BaseController
 
         $model = new SubtareaModel();
         $resultado = [];
+        $identificadoresRecibidos = [];
         foreach ($entradas as $indice => $entrada) {
             if (! is_array($entrada)) {
                 return ['errores' => [
@@ -285,6 +286,7 @@ final class AgendaController extends BaseController
             }
 
             $idCliente = trim((string) ($entrada['id_cliente'] ?? ''));
+            $identificadoresRecibidos[] = $idCliente;
             $titulo = trim((string) ($entrada['titulo'] ?? ''));
             if ($idCliente === '' || mb_strlen($idCliente) > 100 || ($titulo === '' && empty($entrada['eliminado']))) {
                 return ['errores' => [
@@ -324,6 +326,15 @@ final class AgendaController extends BaseController
             ];
             is_array($existente) ? $model->update($id, $registro) : $model->insert($registro);
             $resultado[] = $model->withDeleted()->find($id);
+        }
+
+        $existentes = $model->where('elemento_agenda_id', $elementoId)->findAll();
+        foreach ($existentes as $existente) {
+            if (in_array($existente['id_cliente'], $identificadoresRecibidos, true)) {
+                continue;
+            }
+            $model->update($existente['id'], ['version' => (int) $existente['version'] + 1]);
+            $model->delete($existente['id']);
         }
 
         return ['subtareas' => $resultado];

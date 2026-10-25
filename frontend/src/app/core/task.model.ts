@@ -16,6 +16,8 @@ export interface TaskSubtask {
   id: string;
   title: string;
   completed: boolean;
+  serverId?: string;
+  serverVersion?: number;
 }
 
 export interface LabelReminderSettings {
@@ -36,6 +38,10 @@ export interface Task {
   id: number;
   /** Identificador estable que se conservará entre dispositivos. */
   uuid?: string;
+  /** Identificador interno asignado por la API. */
+  serverId?: string;
+  /** Última versión confirmada por la API. */
+  serverVersion?: number;
   titulo: string;
   tipo: TaskType;
   fecha?: string;
@@ -77,6 +83,11 @@ export interface TaskLabelMeta {
 
 export interface EventPreset {
   id: number;
+  uuid?: string;
+  serverId?: string;
+  serverVersion?: number;
+  syncStatus?: TaskSyncStatus;
+  updatedAt?: string;
   nombre: string;
   color: string;
   horaInicio: string;

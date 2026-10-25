@@ -67,3 +67,13 @@
 #--------------------------------------------------------------------
 
 # logger.threshold = 4
+
+#--------------------------------------------------------------------
+# GOOGLE CALENDAR
+#--------------------------------------------------------------------
+
+GOOGLE_CALENDAR_CLIENT_ID = ""
+GOOGLE_CALENDAR_CLIENT_SECRET = ""
+GOOGLE_CALENDAR_REDIRECT_URI = "http://localhost:8080/api/v1/integraciones/google-calendar/callback"
+GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+GOOGLE_CALENDAR_FRONTEND_RETURN_URI = "http://localhost:8100/home"

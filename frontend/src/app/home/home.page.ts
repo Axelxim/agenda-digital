@@ -32,12 +32,14 @@ import {
   RefresherCustomEvent,
 } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { addIcons } from 'ionicons';
 import { Subscription } from 'rxjs';
 import {
   alertCircleOutline,
   batteryChargingOutline,
   calendarOutline,
+  cloudOutline,
   checkboxOutline,
   chevronBackOutline,
   chevronDownOutline,
@@ -55,6 +57,7 @@ import {
   documentTextOutline,
   notificationsOutline,
   pauseOutline,
+  personCircleOutline,
       pricetagOutline,
       pencilOutline,
       playOutline,
@@ -66,6 +69,7 @@ import {
   timeOutline,
   trashOutline,
   stopCircleOutline,
+  logOutOutline,
   add,
 } from 'ionicons/icons';
 import {
@@ -101,6 +105,14 @@ import { QuickNote } from '../core/note.model';
 import { NoteService } from '../core/note.service';
 import { FixedExpense, FixedExpenseOccurrence, WalletState, WalletTransactionKind } from '../core/wallet.model';
 import { WalletService } from '../core/wallet.service';
+import { AuthService } from '../core/auth.service';
+import { AgendaSyncService } from '../core/agenda-sync.service';
+import {
+  GoogleCalendarConnection,
+  GoogleCalendarItem,
+  GoogleCalendarService,
+  GoogleCalendarTask,
+} from '../core/google-calendar.service';
 
 type ViewMode = 'hoy' | 'calendario' | 'pendientes' | 'mas';
 type CalendarView = 'dia' | 'semana' | 'mes';
@@ -214,15 +226,19 @@ interface TimedEventLayout {
   ],
 })
 export class HomePage implements OnInit, OnDestroy {
+  readonly auth = inject(AuthService);
+  readonly agendaSync = inject(AgendaSyncService);
   private readonly taskService = inject(TaskService);
   private readonly labelReminderService = inject(LabelReminderService);
   private readonly notificationScheduler = inject(NotificationSchedulerService);
   private readonly deviceCalendarService = inject(DeviceCalendarService);
+  private readonly googleCalendarService = inject(GoogleCalendarService);
   private readonly wellnessService = inject(WellnessService);
   private readonly noteService = inject(NoteService);
   private readonly walletService = inject(WalletService);
   private readonly menuController = inject(MenuController);
   private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly router = inject(Router);
 
   @ViewChild(IonModal) modal?: IonModal;
   @ViewChild('agendaTimeline') agendaTimeline?: ElementRef<HTMLElement>;
@@ -238,6 +254,7 @@ export class HomePage implements OnInit, OnDestroy {
   @ViewChild('todayFab') todayFab?: IonFab;
 
   titulo = 'Agenda';
+  profileImageFailed = false;
   selectedView: ViewMode = 'hoy';
   calendarView: CalendarView = 'dia';
   pendingFilter: PendingFilter = 'pendientes';
@@ -272,6 +289,15 @@ export class HomePage implements OnInit, OnDestroy {
   deviceCalendarStatus: 'idle' | 'loading' | 'ready' | 'denied' | 'unavailable' | 'error' = 'idle';
   deviceCalendars: DeviceCalendar[] = [];
   deviceCalendarTasks: DeviceCalendarTask[] = [];
+  googleCalendarConnection: GoogleCalendarConnection = {
+    connected: false,
+    connectedAt: null,
+    selectedCalendarIds: [],
+  };
+  googleCalendars: GoogleCalendarItem[] = [];
+  googleCalendarTasks: GoogleCalendarTask[] = [];
+  googleCalendarStatus: 'idle' | 'loading' | 'connected' | 'disconnected' | 'error' = 'idle';
+  googleCalendarMessage = '';
   deviceCalendarSettings: DeviceCalendarSettings = {
     enabled: false,
     selectedCalendarIds: [],
@@ -442,6 +468,7 @@ export class HomePage implements OnInit, OnDestroy {
       alertCircleOutline,
       batteryChargingOutline,
       calendarOutline,
+      cloudOutline,
       checkboxOutline,
       chevronBackOutline,
       chevronDownOutline,
@@ -459,6 +486,7 @@ export class HomePage implements OnInit, OnDestroy {
       documentTextOutline,
       notificationsOutline,
       pauseOutline,
+      personCircleOutline,
   pricetagOutline,
   pencilOutline,
   playOutline,
@@ -470,6 +498,7 @@ export class HomePage implements OnInit, OnDestroy {
       timeOutline,
       trashOutline,
       stopCircleOutline,
+      logOutOutline,
       add,
     });
   }
@@ -514,6 +543,7 @@ export class HomePage implements OnInit, OnDestroy {
     void this.taskService.initializePersistence().then(({ tasks, presets }) => {
       this.preestablecidos = presets;
       this.setTasks(tasks);
+      this.agendaSync.start();
     });
     this.deviceCalendarSettings = this.deviceCalendarService.loadSettings();
     void this.notificationScheduler.listenForActions((action) =>
@@ -522,6 +552,7 @@ export class HomePage implements OnInit, OnDestroy {
       this.notificationActionListener = listener;
     });
     void this.refreshDeviceCalendarEvents();
+    if (this.auth.isAuthenticated()) void this.initializeGoogleCalendar();
     if (this.deviceCalendarService.supported) {
       void App.addListener('resume', () => {
         this.refreshStoredState();
@@ -547,6 +578,14 @@ export class HomePage implements OnInit, OnDestroy {
     this.updateLiveClock();
     this.currentTimeTimer = setInterval(() => this.updateLiveClock(), 1_000);
     this.initialPermissionTimer = setTimeout(() => void this.requestInitialAndroidPermissions(), 700);
+  }
+
+  setSyncEnabled(enabled: boolean): void {
+    if (enabled) {
+      this.agendaSync.enable();
+    } else {
+      this.agendaSync.disable();
+    }
   }
 
   ngOnDestroy(): void {
@@ -764,7 +803,15 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   get calendarTasks(): Task[] {
-    return [...this.tareas, ...this.deviceCalendarTasks];
+    const external = [...this.googleCalendarTasks, ...this.deviceCalendarTasks];
+    const seen = new Set<string>();
+    const uniqueExternal = external.filter((task) => {
+      const key = `${task.fecha ?? ''}|${task.hora ?? ''}|${task.horaFin ?? ''}|${this.normalizeSearchText(task.titulo.trim())}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return [...this.tareas, ...uniqueExternal];
   }
 
   get activeEvents(): Task[] {
@@ -930,6 +977,25 @@ export class HomePage implements OnInit, OnDestroy {
     }
   }
 
+  async openAccount(): Promise<void> {
+    await this.menuController.close('settings-menu');
+    if (this.auth.isAuthenticated()) {
+      await this.auth.logout();
+      return;
+    }
+
+    await this.router.navigateByUrl('/login');
+  }
+
+  get profileInitial(): string {
+    const name = this.auth.user()?.name?.trim();
+    return name ? name.charAt(0).toUpperCase() : 'T';
+  }
+
+  markProfileImageAsFailed(): void {
+    this.profileImageFailed = true;
+  }
+
   async refreshPage(event: RefresherCustomEvent): Promise<void> {
     try {
       this.currentTime = new Date();
@@ -1081,6 +1147,7 @@ export class HomePage implements OnInit, OnDestroy {
       1,
     );
     this.buildCalendar();
+    if (this.googleCalendarConnection.connected) void this.refreshGoogleCalendarEvents();
   }
 
   nextMonth(): void {
@@ -1090,6 +1157,7 @@ export class HomePage implements OnInit, OnDestroy {
       1,
     );
     this.buildCalendar();
+    if (this.googleCalendarConnection.connected) void this.refreshGoogleCalendarEvents();
   }
 
   nuevaTarea(fecha?: string, hora?: string): void {
@@ -1750,11 +1818,12 @@ export class HomePage implements OnInit, OnDestroy {
     if (!query) return [];
 
     const results: GlobalSearchResult[] = [];
-    const tasks = [...this.tareas, ...this.deviceCalendarTasks];
+    const tasks = [...this.tareas, ...this.deviceCalendarTasks, ...this.googleCalendarTasks];
     const seenTasks = new Set<string>();
     for (const task of tasks) {
       const external = this.deviceCalendarTasks.find((item) => item.id === task.id);
-      const sourceKey = `${external ? 'external' : 'local'}:${task.id}`;
+      const googleExternal = this.googleCalendarTasks.some((item) => item.id === task.id);
+      const sourceKey = `${external || googleExternal ? 'external' : 'local'}:${task.id}`;
       if (seenTasks.has(sourceKey)) continue;
       seenTasks.add(sourceKey);
       const kind: GlobalSearchResultKind = external?.externalKind === 'birthday'
@@ -1876,7 +1945,8 @@ export class HomePage implements OnInit, OnDestroy {
       this.selectMonthDate(task.fecha);
       setTimeout(() => this.scrollToCurrentHour());
     }
-    const external = this.deviceCalendarTasks.some((item) => item.id === task.id);
+    const external = this.deviceCalendarTasks.some((item) => item.id === task.id)
+      || this.googleCalendarTasks.some((item) => item.id === task.id);
     if (external || task.tipo === 'evento') this.openCalendarItem(task);
     else this.editarTarea(task);
   }
@@ -2901,7 +2971,10 @@ export class HomePage implements OnInit, OnDestroy {
   async abrirCalendariosDispositivo(): Promise<void> {
     this.deviceCalendarSettings = this.deviceCalendarService.loadSettings();
     await this.deviceCalendarModal?.present();
-    await this.loadDeviceCalendars(false);
+    await Promise.all([
+      this.loadDeviceCalendars(false),
+      this.auth.isAuthenticated() ? this.refreshGoogleCalendar(true) : Promise.resolve(),
+    ]);
   }
 
   cerrarCalendariosDispositivo(): void {
@@ -2911,6 +2984,125 @@ export class HomePage implements OnInit, OnDestroy {
   async refreshDeviceCalendars(): Promise<void> {
     await this.loadDeviceCalendars(false);
     await this.refreshDeviceCalendarEvents();
+  }
+
+  async connectGoogleCalendar(): Promise<void> {
+    this.googleCalendarStatus = 'loading';
+    this.googleCalendarMessage = '';
+    try {
+      await this.googleCalendarService.connect();
+    } catch (error) {
+      this.googleCalendarStatus = 'error';
+      this.googleCalendarMessage = this.httpErrorMessage(error, 'No fue posible abrir la autorización de Google.');
+    }
+  }
+
+  async disconnectGoogleCalendar(): Promise<void> {
+    this.googleCalendarStatus = 'loading';
+    try {
+      await this.googleCalendarService.disconnect();
+      this.googleCalendarConnection = { connected: false, connectedAt: null, selectedCalendarIds: [] };
+      this.googleCalendars = [];
+      this.googleCalendarTasks = [];
+      this.googleCalendarStatus = 'disconnected';
+      this.googleCalendarMessage = 'Google Calendar fue desconectado.';
+      this.buildCalendar();
+    } catch (error) {
+      this.googleCalendarStatus = 'error';
+      this.googleCalendarMessage = this.httpErrorMessage(error, 'No fue posible desconectar Google Calendar.');
+    }
+  }
+
+  isGoogleCalendarSelected(calendarId: string): boolean {
+    return this.googleCalendars.find((calendar) => calendar.id === calendarId)?.selected === true;
+  }
+
+  async setGoogleCalendarSelected(calendarId: string, selected: boolean): Promise<void> {
+    this.googleCalendars = this.googleCalendars.map((calendar) =>
+      calendar.id === calendarId ? { ...calendar, selected } : calendar,
+    );
+    const ids = this.googleCalendars.filter((calendar) => calendar.selected).map((calendar) => calendar.id);
+    try {
+      await this.googleCalendarService.selectCalendars(ids);
+      this.googleCalendarConnection = { ...this.googleCalendarConnection, selectedCalendarIds: ids };
+      await this.refreshGoogleCalendarEvents();
+    } catch (error) {
+      this.googleCalendarMessage = this.httpErrorMessage(error, 'No fue posible guardar los calendarios seleccionados.');
+      await this.loadGoogleCalendars();
+    }
+  }
+
+  async refreshGoogleCalendar(loadCalendars = true): Promise<void> {
+    if (!this.auth.isAuthenticated()) return;
+    this.googleCalendarStatus = 'loading';
+    this.googleCalendarMessage = '';
+    try {
+      this.googleCalendarConnection = await this.googleCalendarService.status();
+      if (!this.googleCalendarConnection.connected) {
+        this.googleCalendarStatus = 'disconnected';
+        this.googleCalendars = [];
+        this.googleCalendarTasks = [];
+        return;
+      }
+      if (loadCalendars) await this.loadGoogleCalendars();
+      await this.refreshGoogleCalendarEvents();
+      this.googleCalendarStatus = 'connected';
+    } catch (error) {
+      this.googleCalendarStatus = 'error';
+      this.googleCalendarMessage = this.httpErrorMessage(error, 'No fue posible consultar Google Calendar.');
+    } finally {
+      this.buildCalendar();
+      this.refreshView();
+    }
+  }
+
+  private async initializeGoogleCalendar(): Promise<void> {
+    const result = new URLSearchParams(window.location.search).get('google_calendar');
+    if (result) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    await this.refreshGoogleCalendar(true);
+    if (result === 'connected') {
+      this.googleCalendarMessage = 'Google Calendar quedó conectado correctamente.';
+    } else if (result === 'expired') {
+      this.googleCalendarMessage = 'La autorización expiró. Inténtalo nuevamente.';
+      this.googleCalendarStatus = 'error';
+    } else if (result === 'error') {
+      this.googleCalendarMessage = 'Google no pudo completar la autorización.';
+      this.googleCalendarStatus = 'error';
+    }
+    this.refreshView();
+  }
+
+  private async loadGoogleCalendars(): Promise<void> {
+    this.googleCalendars = await this.googleCalendarService.calendars();
+  }
+
+  private async refreshGoogleCalendarEvents(): Promise<void> {
+    if (!this.googleCalendarConnection.connected) return;
+    const from = new Date(this.currentMonth.getFullYear(), this.currentMonth.getMonth() - 6, 1);
+    const to = new Date(this.currentMonth.getFullYear(), this.currentMonth.getMonth() + 7, 1);
+    const events = await this.googleCalendarService.events(
+      this.taskService.toISODate(from),
+      this.taskService.toISODate(to),
+    );
+    this.googleCalendarTasks = events.map((event) => ({
+      ...event,
+      color: this.googleCalendars.find((calendar) =>
+        calendar.id === event.googleCalendarId || (event.googleCalendarId === 'primary' && calendar.primary),
+      )?.color ?? event.color,
+    }));
+    this.buildCalendar();
+    this.refreshView();
+  }
+
+  private httpErrorMessage(error: unknown, fallback: string): string {
+    if (error && typeof error === 'object' && 'error' in error) {
+      const body = (error as { error?: { messages?: Record<string, string>; message?: string } }).error;
+      const first = body?.messages ? Object.values(body.messages)[0] : body?.message;
+      if (first) return first;
+    }
+    return fallback;
   }
 
   async setDeviceCalendarEnabled(enabled: boolean): Promise<void> {
@@ -2971,7 +3163,8 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   isDeviceCalendarEvent(tarea: Task): boolean {
-    return tarea.id < 0;
+    return this.deviceCalendarTasks.some((event) => event.id === tarea.id)
+      || this.googleCalendarTasks.some((event) => event.id === tarea.id);
   }
 
   isBirthdayEvent(tarea: Task): boolean {
@@ -2985,6 +3178,11 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   openCalendarItem(tarea: Task): void {
+    const googleEvent = this.googleCalendarTasks.find((event) => event.id === tarea.id);
+    if (googleEvent) {
+      if (googleEvent.googleEventUrl) window.open(googleEvent.googleEventUrl, '_blank', 'noopener');
+      return;
+    }
     const externalEvent = this.externalCalendarEvent(tarea);
     if (!externalEvent || externalEvent.writable) this.abrirDetalleEvento(tarea);
   }
