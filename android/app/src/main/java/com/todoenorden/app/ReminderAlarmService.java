@@ -1,4 +1,4 @@
-package io.ionic.starter;
+package com.todoenorden.app;
 
 import android.app.ActivityOptions;
 import android.app.NotificationChannel;
@@ -30,10 +30,12 @@ import java.util.Set;
 
 public class ReminderAlarmService extends Service {
     private static final String TAG = "AgendaReminder";
-    static final String ACTION_START = "io.ionic.starter.START_REMINDER_ALARM";
-    static final String ACTION_STOP = "io.ionic.starter.STOP_REMINDER_ALARM";
+    static final String ACTION_START = "com.todoenorden.app.START_REMINDER_ALARM";
+    static final String ACTION_STOP = "com.todoenorden.app.STOP_REMINDER_ALARM";
+    private static final String ACTION_SCREEN_VISIBLE = "com.todoenorden.app.REMINDER_SCREEN_VISIBLE";
 
     private static final String CHANNEL_ID = "agenda-urgent-alarm-v2";
+    private static final String QUIET_CHANNEL_ID = "agenda-active-alarm-v1";
     private static final int SERVICE_NOTIFICATION_ID = 76001;
     private static final String ACTIVE_PREFS = "agenda_active_alarm";
     private static final String ACTIVE_ID = "activeId";
@@ -44,6 +46,7 @@ public class ReminderAlarmService extends Service {
     private MediaPlayer player;
     private Vibrator vibrator;
     private PowerManager.WakeLock wakeLock;
+    private JSONObject activeReminder;
 
     @Override
     public void onCreate() {
@@ -58,6 +61,11 @@ public class ReminderAlarmService extends Service {
             return START_NOT_STICKY;
         }
 
+        if (ACTION_SCREEN_VISIBLE.equals(intent.getAction())) {
+            moveNotificationToQuietChannel();
+            return START_NOT_STICKY;
+        }
+
         String raw = intent.getStringExtra(AgendaReminderPlugin.EXTRA_REMINDER);
         if (raw == null || raw.isEmpty()) {
             stopSelfSafely();
@@ -66,6 +74,7 @@ public class ReminderAlarmService extends Service {
 
         try {
             JSONObject reminder = new JSONObject(raw);
+            activeReminder = reminder;
             int reminderId = reminder.optInt("id");
             Log.i(TAG, "Alarm service started id=" + reminderId + " at=" + System.currentTimeMillis());
             getSharedPreferences(ACTIVE_PREFS, MODE_PRIVATE)
@@ -104,6 +113,12 @@ public class ReminderAlarmService extends Service {
         context.stopService(new Intent(context, ReminderAlarmService.class));
     }
 
+    static void markScreenVisible(Context context) {
+        Intent intent = new Intent(context, ReminderAlarmService.class);
+        intent.setAction(ACTION_SCREEN_VISIBLE);
+        context.startService(intent);
+    }
+
     static void stopIfActive(Context context, Set<Integer> reminderIds) {
         int activeId = context.getSharedPreferences(ACTIVE_PREFS, MODE_PRIVATE)
             .getInt(ACTIVE_ID, Integer.MIN_VALUE);
@@ -140,6 +155,33 @@ public class ReminderAlarmService extends Service {
             addAction(builder, reminder, "discard", "Descartar", 303);
         }
         return builder.build();
+    }
+
+    private android.app.Notification buildQuietNotification(JSONObject reminder, PendingIntent screenIntent) {
+        String title = reminder.optString("taskTitle", "Recordatorio activo");
+        return new NotificationCompat.Builder(this, QUIET_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setColor(Color.rgb(59, 130, 246))
+            .setContentTitle(title)
+            .setContentText("Recordatorio en pantalla")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setContentIntent(screenIntent)
+            .build();
+    }
+
+    private void moveNotificationToQuietChannel() {
+        if (activeReminder == null) return;
+        PendingIntent screenIntent = createScreenIntent(activeReminder);
+        startForeground(
+            SERVICE_NOTIFICATION_ID,
+            buildQuietNotification(activeReminder, screenIntent)
+        );
     }
 
     private PendingIntent createScreenIntent(JSONObject reminder) {
@@ -242,20 +284,37 @@ public class ReminderAlarmService extends Service {
     private void createChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager manager = getSystemService(NotificationManager.class);
-        if (manager == null || manager.getNotificationChannel(CHANNEL_ID) != null) return;
+        if (manager == null) return;
 
-        NotificationChannel channel = new NotificationChannel(
-            CHANNEL_ID,
-            "Alarmas de tareas",
-            NotificationManager.IMPORTANCE_HIGH
-        );
-        channel.setDescription("Pantalla y sonido para recordatorios urgentes");
-        channel.setSound(null, null);
-        channel.enableVibration(false);
-        channel.enableLights(true);
-        channel.setLightColor(Color.rgb(59, 130, 246));
-        channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
-        manager.createNotificationChannel(channel);
+        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID,
+                "Alarmas de tareas",
+                NotificationManager.IMPORTANCE_HIGH
+            );
+            channel.setDescription("Pantalla y sonido para recordatorios urgentes");
+            channel.setSound(null, null);
+            channel.enableVibration(false);
+            channel.enableLights(true);
+            channel.setLightColor(Color.rgb(59, 130, 246));
+            channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+            manager.createNotificationChannel(channel);
+        }
+
+        if (manager.getNotificationChannel(QUIET_CHANNEL_ID) == null) {
+            NotificationChannel quietChannel = new NotificationChannel(
+                QUIET_CHANNEL_ID,
+                "Alarma activa",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            quietChannel.setDescription("Mantiene activa una alarma que ya está en pantalla");
+            quietChannel.setSound(null, null);
+            quietChannel.enableVibration(false);
+            quietChannel.enableLights(false);
+            quietChannel.setShowBadge(false);
+            quietChannel.setLockscreenVisibility(android.app.Notification.VISIBILITY_SECRET);
+            manager.createNotificationChannel(quietChannel);
+        }
     }
 
     private void stopSelfSafely() {

@@ -82,7 +82,7 @@ describe('NotificationSchedulerService', () => {
   it('schedules a fixed payment one day before and on its due date', () => {
     const expense = {
       id: 'rent', name: 'Renta', amount: 4500, category: 'Hogar', dueDay: 26,
-      frequencyMonths: 1 as const, trackingStartDate: '2026-10-01', reminderTime: '09:00', active: true,
+      frequencyMonths: 1 as const, firstDueDate: '2026-10-26', trackingStartDate: '2026-10-01', reminderTime: '09:00', active: true,
       createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
     };
     const notifications = service.buildWalletNotifications([{

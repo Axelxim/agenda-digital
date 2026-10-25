@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_background">#F0090D15</color>
+    <color name="widget_border">#FF1E293B</color>
+    <color name="widget_event_background">#FF242831</color>
+    <color name="widget_event_border">#FF303A4B</color>
+    <color name="widget_text_primary">#FFF4F7FB</color>
+    <color name="widget_text_secondary">#FFBBC4D2</color>
+    <color name="widget_text_muted">#FF7F8CA3</color>
+    <color name="widget_divider">#FF202735</color>
+    <color name="widget_check_default">#FFDCE2EA</color>
+    <color name="widget_transparent">#00000000</color>
+</resources>

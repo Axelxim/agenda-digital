@@ -75,15 +75,18 @@ describe('WalletService', () => {
   it('creates bimonthly obligations and records the amount actually paid', () => {
     const [expense] = service.saveFixedExpense({
       name: 'Luz', amount: 800, category: 'Servicios', dueDay: 20,
-      frequencyMonths: 2, reminderTime: '09:00', active: true,
+      frequencyMonths: 2, firstDueDate: '2026-11-20', reminderTime: '09:00', active: true,
     }).fixedExpenses;
-    const occurrences = service.occurrences(new Date(), 0, 4)
+    const occurrences = service.occurrences(new Date('2026-10-24T12:00:00'), 0, 6)
       .filter((item) => item.expense.id === expense.id);
 
-    expect(occurrences.length).toBeGreaterThanOrEqual(2);
-    const firstMonth = Number(occurrences[0].period.slice(5));
-    const secondMonth = Number(occurrences[1].period.slice(5));
-    expect((secondMonth - firstMonth + 12) % 12).toBe(2);
+    expect(occurrences.map((item) => item.dueDate)).toEqual([
+      '2026-11-20',
+      '2027-01-20',
+      '2027-03-20',
+    ]);
+    expect(service.summary(new Date('2026-11-20T12:00:00')).pendingFixed).toBe(800);
+    expect(service.summary(new Date('2026-12-20T12:00:00')).pendingFixed).toBe(0);
 
     service.markFixedPaid(occurrences[0], occurrences[0].dueDate, 675.5);
     expect(service.getState().transactions[0]).toMatchObject({

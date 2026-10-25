@@ -117,6 +117,12 @@ export class NotificationSchedulerService {
     return AgendaReminder.checkBatteryOptimization();
   }
 
+  async requestNotificationPermission(): Promise<boolean> {
+    if (!Capacitor.isNativePlatform()) return true;
+    const permission = await LocalNotifications.requestPermissions();
+    return permission.display === 'granted';
+  }
+
   async requestBatteryOptimizationExemption(): Promise<void> {
     if (Capacitor.getPlatform() !== 'android') return;
     await AgendaReminder.requestBatteryOptimizationExemption();

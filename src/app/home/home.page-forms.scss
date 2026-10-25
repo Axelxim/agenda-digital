@@ -1,0 +1,52 @@
+@media (max-width: 380px) {
+  .event-overview { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (prefers-color-scheme: dark) {
+  :host { --bg: #10131a; --surface: #171b24; --soft: #202635; --text: #f4f7fb; --muted: #a5b0c3; --border: #2a3242; --primary: #5aa2ff; }
+  .app-header ion-toolbar, .bottom-nav { --background: rgba(16,19,26,.92); }
+  .summary-card { background: linear-gradient(180deg,#1a2030,#151a25); }
+  .task-card.expired { background: #25191d; border-color: #7f1d1d; }
+  .priority-picker button.selected { background: #182b47; }
+}
+
+:host { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.app-header ion-title, h1, .calendar-header h1, .pending-view h1, .more-view h1 { font-weight: 600; }
+.section-heading h2, .task-main h3, .agenda-label, .calendar-view-switch button, .today-button, .bottom-nav button, .summary-card span, .task-meta, .weekdays, .calendar-day, .day-picker, .color-picker { font-weight: 500; }
+.agenda-task { position: absolute; top: 0; left: 10px; margin: 0; }
+.week-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.week-grid { min-width: 560px; }
+.week-header, .week-hour-row { grid-template-columns: 52px repeat(7, minmax(72px, 1fr)); }
+.week-header { position: sticky; top: 0; z-index: 5; border-bottom: 1px solid var(--border); }
+.week-timeline { overflow: visible; border: 0; border-radius: 0; background: transparent; }
+.week-hour-row { min-width: 0; height: 56px; min-height: 56px; }
+.week-slot { position: relative; overflow: visible; min-height: 56px; padding: 0; }
+.week-slot .agenda-task { position: absolute; z-index: 3; display: grid; gap: 2px; width: calc(100% - 6px); margin: 0; padding: 5px; white-space: normal; }
+.week-slot .agenda-task small { overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
+.weekdays, .calendar-grid { min-width: 0; }
+.calendar-grid { grid-auto-rows: minmax(42px, 1fr); overflow: visible; }
+.calendar-day { min-width: 0; min-height: 42px; aspect-ratio: auto; }
+.month-event { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--event-color) 35%, var(--border)); border-left: 4px solid var(--event-color); border-radius: 8px; background: color-mix(in srgb, var(--event-color) 10%, var(--surface)); color: var(--text); text-align: left; }
+.month-event strong { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.month-event small, .month-events-empty { margin: 0; color: var(--muted); font-size: 12px; font-weight: 400; }
+.today-fab { right: 18px; bottom: calc(14px + env(safe-area-inset-bottom)); }
+.today-fab ion-fab-button { --background: var(--primary); --color: #fff; --box-shadow: 0 8px 20px rgba(15, 23, 42, .24); }
+.settings-labels { display: grid; gap: 12px; padding: 20px 16px 32px; }
+.settings-labels h2, .settings-labels p { margin: 0; }
+.settings-labels h2 { font-size: 18px; font-weight: 600; }
+.settings-labels p { color: var(--muted); font-size: 14px; font-weight: 400; }
+.label-row { font-weight: 500; }
+.label-row strong { font-weight: 600; }
+.time-validation { margin: -4px 0 0; color: #ef4444; font-size: 12px; font-weight: 500; }
+.agenda-task, .month-event { transition: height .18s ease, box-shadow .18s ease, transform .18s ease; }
+.agenda-task.expanded, .month-event.expanded { z-index: 8; box-shadow: 0 8px 18px rgba(15, 23, 42, .2); }
+.agenda-task.expanded { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; }
+.event-inline-actions { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-height: 44px; margin-top: 4px; border-top: 1px solid color-mix(in srgb, var(--event-color) 28%, var(--border)); animation: event-actions-in .18s ease-out; }
+.event-icon-action { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; color: var(--text); font-size: 22px; }
+.event-icon-action:active { background: color-mix(in srgb, var(--event-color) 24%, transparent); transform: scale(.94); }
+.danger { color: #ef4444; }
+.event-scope-picker, .event-cancel-confirmation { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 44px; padding-top: 6px; font-size: 11px; }
+.event-scope-picker > span, .event-cancel-confirmation > span[role="button"] { min-height: 32px; padding: 0 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); line-height: 32px; }
+.event-cancel-confirmation { justify-content: flex-end; }
+@keyframes event-actions-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }

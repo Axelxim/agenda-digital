@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { App } from '@capacitor/app';
-import { PluginListenerHandle } from '@capacitor/core';
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { ActionPerformed } from '@capacitor/local-notifications';
 import {
   IonButton,
@@ -177,7 +177,13 @@ interface TimedEventLayout {
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
-  styleUrls: ['home.page.scss'],
+  styleUrls: [
+    'home.page.scss',
+    'home.page-calendar.scss',
+    'home.page-forms.scss',
+    'home.page-components.scss',
+    'home.page-responsive.scss',
+  ],
   imports: [
     FormsModule,
     NgTemplateOutlet,
@@ -328,6 +334,7 @@ export class HomePage implements OnInit, OnDestroy {
   fixedExpenseCategory = 'Servicios';
   fixedExpenseDueDay = 1;
   fixedExpenseFrequencyMonths: 1 | 2 = 1;
+  fixedExpenseFirstDueDate = '';
   fixedExpenseReminderTime = '09:00';
   payingFixedOccurrence: FixedExpenseOccurrence | null = null;
   fixedPaymentAmount: number | null = null;
@@ -359,6 +366,7 @@ export class HomePage implements OnInit, OnDestroy {
   nuevaFecha = '';
   nuevaHora = '';
   nuevaHoraFin = '';
+  taskScheduleEnabled = false;
   taskSubtasks: TaskSubtask[] = [];
   newSubtaskTitle = '';
   advancedModeEnabled = false;
@@ -372,6 +380,7 @@ export class HomePage implements OnInit, OnDestroy {
   presetHorarios: EventPresetSchedule[] = [];
   presetActiveDay: number | null = null;
   editingPresetId: number | null = null;
+  routineEditorOpen = false;
   prioridad: TaskPriority = 'media';
   etiqueta: TaskLabel | undefined = undefined;
   actividadMadreId: number | undefined = undefined;
@@ -379,9 +388,11 @@ export class HomePage implements OnInit, OnDestroy {
   repeticion: TaskRepeat = 'none';
   private currentTimeTimer?: ReturnType<typeof setInterval>;
   private appResumeListener?: PluginListenerHandle;
+  private appBackButtonListener?: PluginListenerHandle;
   private calendarChangeListener?: PluginListenerHandle;
   private notificationActionListener?: PluginListenerHandle;
   private calendarRefreshTimer?: ReturnType<typeof setTimeout>;
+  private initialPermissionTimer?: ReturnType<typeof setTimeout>;
   private readonly liveStateSubscriptions = new Subscription();
   private lastClockMinute = '';
   private lastStoredRefreshAt = 0;
@@ -393,6 +404,7 @@ export class HomePage implements OnInit, OnDestroy {
   private reminderSettingsReady = false;
   private readonly fabPositionKey = 'home-fab-position';
   private readonly advancedModeKey = 'agenda-advanced-mode';
+  private readonly initialPermissionKey = 'agenda-native-permissions-v1';
   private fabDrag?: {
     pointerId: number;
     startX: number;
@@ -407,6 +419,7 @@ export class HomePage implements OnInit, OnDestroy {
   fabOffsetY = 0;
   fabListSide: 'top' | 'bottom' = 'top';
   fabDragging = false;
+  medicationHomeExpanded = false;
 
   readonly etiquetas = this.taskService.etiquetas;
   readonly reminderLeadOptions = this.labelReminderService.leadOptions;
@@ -524,8 +537,16 @@ export class HomePage implements OnInit, OnDestroy {
         this.calendarChangeListener = listener;
       });
     }
+    if (Capacitor.getPlatform() === 'android') {
+      void App.addListener('backButton', () => {
+        void this.handleAndroidBack();
+      }).then((listener) => {
+        this.appBackButtonListener = listener;
+      });
+    }
     this.updateLiveClock();
     this.currentTimeTimer = setInterval(() => this.updateLiveClock(), 1_000);
+    this.initialPermissionTimer = setTimeout(() => void this.requestInitialAndroidPermissions(), 700);
   }
 
   ngOnDestroy(): void {
@@ -533,6 +554,7 @@ export class HomePage implements OnInit, OnDestroy {
       clearInterval(this.currentTimeTimer);
     }
     void this.appResumeListener?.remove();
+    void this.appBackButtonListener?.remove();
     void this.calendarChangeListener?.remove();
     void this.notificationActionListener?.remove();
     this.liveStateSubscriptions.unsubscribe();
@@ -540,6 +562,7 @@ export class HomePage implements OnInit, OnDestroy {
     window.removeEventListener('focus', this.windowFocusListener);
     document.removeEventListener('visibilitychange', this.visibilityChangeListener);
     if (this.calendarRefreshTimer) clearTimeout(this.calendarRefreshTimer);
+    if (this.initialPermissionTimer) clearTimeout(this.initialPermissionTimer);
   }
 
   private connectLiveState(): void {
@@ -590,7 +613,7 @@ export class HomePage implements OnInit, OnDestroy {
     if (now - this.lastStoredRefreshAt < 250) return;
     this.lastStoredRefreshAt = now;
     this.currentTime = new Date();
-    this.taskService.load();
+    if (Capacitor.getPlatform() !== 'android') this.taskService.load();
     this.preestablecidos = this.taskService.loadEventPresets();
     this.labelReminderSettings = this.labelReminderService.load(
       this.etiquetas.map((label) => label.nombre),
@@ -603,8 +626,77 @@ export class HomePage implements OnInit, OnDestroy {
     this.quickNotes = this.noteService.load();
     this.walletState = this.walletService.load();
     this.buildCalendar();
-    this.syncNotifications();
+    if (Capacitor.getPlatform() !== 'android') this.syncNotifications();
     this.refreshView();
+    if (Capacitor.getPlatform() === 'android') {
+      void this.taskService.initializePersistence().then(({ tasks, presets }) => {
+        this.preestablecidos = presets;
+        this.setTasks(tasks);
+      });
+    }
+  }
+
+  private async handleAndroidBack(): Promise<void> {
+    if (this.eventCancelAlertOpen) {
+      this.cancelarConfirmacionEvento();
+      return;
+    }
+    if (this.eventEditorOpen) {
+      this.cerrarEditorEvento();
+      return;
+    }
+    if (this.birthdayEditorOpen) {
+      this.cerrarEditorCumpleanos();
+      return;
+    }
+    if (this.selectedEvent) {
+      this.cerrarDetalleEvento();
+      return;
+    }
+    if (await this.menuController.isOpen('settings-menu')) {
+      await this.menuController.close('settings-menu');
+      return;
+    }
+
+    const topModal = document.querySelector<HTMLIonModalElement>('ion-modal.modal-top');
+    if (topModal) {
+      if (topModal.id === 'task-editor-modal') {
+        this.cerrarModal();
+        return;
+      }
+      if (topModal.id === 'routines-modal' && this.routineEditorOpen) {
+        this.cancelarEdicionPreestablecido();
+        return;
+      }
+      if (topModal.id === 'wellness-modal' && this.wellnessView === 'medication') {
+        this.volverDesdeBienestar();
+        return;
+      }
+      if (topModal.id === 'treatments-modal' && this.selectedHistoryGroupKey) {
+        this.cerrarHistorialTratamiento();
+        return;
+      }
+      if (topModal.id === 'notes-modal' && this.notesView === 'editor') {
+        this.resetNoteEditor();
+        return;
+      }
+      if (topModal.id === 'wallet-modal' && this.walletView !== 'dashboard') {
+        this.walletView = 'dashboard';
+        return;
+      }
+      await topModal.dismiss();
+      return;
+    }
+
+    if (this.expandedTaskId !== null) {
+      this.expandedTaskId = null;
+      return;
+    }
+    if (this.selectedView !== 'hoy') {
+      this.selectView('hoy');
+      return;
+    }
+    await App.exitApp();
   }
 
   private refreshView(): void {
@@ -615,13 +707,16 @@ export class HomePage implements OnInit, OnDestroy {
     if (this.selectedView === 'hoy') {
       const homeOrder: TaskSection['id'][] = [
         'sin-fecha',
-        'proximas',
         'manana',
+        'proximas',
         'vencidas',
       ];
-      return homeOrder.flatMap((id) =>
-        this.secciones.filter((section) => section.id === id),
-      );
+      return homeOrder
+        .flatMap((id) => this.secciones.filter((section) => section.id === id))
+        .map((section) => section.id === 'proximas'
+          ? { ...section, tareas: section.tareas.filter((tarea) => tarea.tipo === 'tarea') }
+          : section)
+        .filter((section) => section.tareas.length > 0);
     }
 
     return this.secciones;
@@ -642,7 +737,9 @@ export class HomePage implements OnInit, OnDestroy {
 
     if (this.pendingFilter === 'vencidas') {
       return this.tareas.filter(
-        (tarea) => tarea.tipo === 'tarea' && tarea.estado === 'vencida',
+        (tarea) =>
+          tarea.tipo === 'tarea' &&
+          (tarea.estado === 'vencida' || tarea.estado === 'ignorada'),
       );
     }
 
@@ -782,6 +879,11 @@ export class HomePage implements OnInit, OnDestroy {
 
   get timeRangeInvalid(): boolean {
     return !!this.nuevaHora && !!this.nuevaHoraFin && this.nuevaHoraFin <= this.nuevaHora;
+  }
+
+  get taskSchedulingInvalid(): boolean {
+    if (this.formItemType !== 'tarea') return false;
+    return this.taskScheduleEnabled && !this.nuevaFecha;
   }
 
   get weekDays(): WeekDay[] {
@@ -994,7 +1096,8 @@ export class HomePage implements OnInit, OnDestroy {
     this.formMode = 'create';
     this.formItemType = 'tarea';
     this.editingTaskId = null;
-    this.resetForm(fecha);
+    this.resetForm(fecha ?? this.taskService.toISODate(new Date()));
+    this.taskScheduleEnabled = !!fecha;
     this.nuevaHora = hora ?? '';
     this.nuevaHoraFin = hora ? this.addMinutesToTime(hora, 60) : '';
     this.eventColor = '#2563eb';
@@ -1005,7 +1108,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.formMode = 'create';
     this.formItemType = 'evento';
     this.editingTaskId = null;
-    this.resetForm(fecha);
+    this.resetForm(fecha ?? this.taskService.toISODate(new Date()));
     this.nuevaHora = hora ?? '';
     this.nuevaHoraFin = hora ? this.addMinutesToTime(hora, 60) : '';
     this.eventColor = '#2563eb';
@@ -1166,7 +1269,7 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   async guardarFormulario(): Promise<void> {
-    if (this.timeRangeInvalid) return;
+    if (this.timeRangeInvalid || this.taskSchedulingInvalid) return;
 
     if (this.editingTaskId !== null && this.formMode === 'reschedule' && this.formItemType === 'tarea') {
       this.setTasks(
@@ -1181,12 +1284,13 @@ export class HomePage implements OnInit, OnDestroy {
       return;
     }
 
+    const taskWithoutSchedule = this.formItemType === 'tarea' && !this.taskScheduleEnabled;
     const draft = {
       titulo: this.nuevoTitulo,
       tipo: this.formItemType,
-      fecha: this.nuevaFecha,
-      hora: this.nuevaHora,
-      horaFin: this.nuevaHoraFin,
+      fecha: taskWithoutSchedule ? '' : this.nuevaFecha,
+      hora: taskWithoutSchedule ? '' : this.nuevaHora,
+      horaFin: taskWithoutSchedule ? '' : this.nuevaHoraFin,
       color: this.formItemType === 'evento' ? this.eventColor : undefined,
       prioridad: this.prioridad,
       etiqueta: this.etiqueta,
@@ -1376,6 +1480,22 @@ export class HomePage implements OnInit, OnDestroy {
     this.modal?.dismiss();
   }
 
+  setTaskScheduleEnabled(enabled: boolean): void {
+    this.taskScheduleEnabled = enabled;
+    if (enabled) {
+      this.nuevaFecha ||= this.taskService.toISODate(new Date());
+      return;
+    }
+    this.nuevaFecha = '';
+    this.nuevaHora = '';
+    this.nuevaHoraFin = '';
+    this.repeticion = 'none';
+  }
+
+  focusEndTime(input: IonInput): void {
+    window.setTimeout(() => void input.setFocus(), 0);
+  }
+
   cerrarEditorEvento(): void {
     this.eventEditorOpen = false;
     this.eventRepeatExpanded = false;
@@ -1498,9 +1618,11 @@ export class HomePage implements OnInit, OnDestroy {
       : this.taskService.updateEventPreset({ ...preset, id: this.editingPresetId });
     this.setTasks(this.taskService.getAll());
     this.resetPresetForm();
+    this.routineEditorOpen = false;
   }
 
   editarPreestablecido(preset: EventPreset): void {
+    this.routineEditorOpen = true;
     this.editingPresetId = preset.id;
     this.presetNombre = preset.nombre;
     this.presetColor = preset.color;
@@ -1516,6 +1638,12 @@ export class HomePage implements OnInit, OnDestroy {
 
   cancelarEdicionPreestablecido(): void {
     this.resetPresetForm();
+    this.routineEditorOpen = false;
+  }
+
+  nuevaRutina(): void {
+    this.resetPresetForm();
+    this.routineEditorOpen = true;
   }
 
   private resetPresetForm(): void {
@@ -1542,10 +1670,14 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   abrirPreestablecidos(): void {
+    this.resetPresetForm();
+    this.routineEditorOpen = false;
     this.presetModal?.present();
   }
 
   cerrarPreestablecidos(): void {
+    this.resetPresetForm();
+    this.routineEditorOpen = false;
     this.presetModal?.dismiss();
   }
 
@@ -1932,6 +2064,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.fixedExpenseCategory = expense?.category ?? 'Servicios';
     this.fixedExpenseDueDay = expense?.dueDay ?? 1;
     this.fixedExpenseFrequencyMonths = expense?.frequencyMonths ?? 1;
+    this.fixedExpenseFirstDueDate = expense?.firstDueDate ?? this.taskService.toISODate(this.currentTime);
     this.fixedExpenseReminderTime = expense?.reminderTime ?? '09:00';
     this.walletView = 'fixed';
   }
@@ -1944,6 +2077,7 @@ export class HomePage implements OnInit, OnDestroy {
       category: this.fixedExpenseCategory,
       dueDay: this.fixedExpenseDueDay,
       frequencyMonths: this.fixedExpenseFrequencyMonths,
+      firstDueDate: this.fixedExpenseFirstDueDate,
       reminderTime: this.fixedExpenseReminderTime,
       active: true,
     }, this.editingFixedExpenseId ?? undefined);
@@ -2065,6 +2199,13 @@ export class HomePage implements OnInit, OnDestroy {
     this.treatmentsModal?.dismiss();
   }
 
+  async agregarTratamientoDesdeAdministrador(): Promise<void> {
+    await this.treatmentsModal?.dismiss();
+    this.startNewTreatment();
+    this.returnToTreatmentManager = true;
+    await this.wellnessModal?.present();
+  }
+
   async nuevoMedicamentoDesdeFab(): Promise<void> {
     if (!this.wellnessSettings.enabled) return;
     this.medicationTreatments = this.wellnessService.loadTreatments();
@@ -2131,6 +2272,10 @@ export class HomePage implements OnInit, OnDestroy {
       return;
     }
     if (this.wellnessView === 'treatment') {
+      if (this.returnToTreatmentManager) {
+        this.volverAlAdministradorDeTratamientos();
+        return;
+      }
       this.cerrarBienestar();
     }
   }
@@ -2274,6 +2419,10 @@ export class HomePage implements OnInit, OnDestroy {
     this.medicationDoses = this.wellnessService.getDoses();
     this.buildCalendar();
     this.syncNotifications(true);
+    if (this.returnToTreatmentManager) {
+      this.volverAlAdministradorDeTratamientos();
+      return;
+    }
     this.cerrarBienestar();
   }
 
@@ -2513,15 +2662,34 @@ export class HomePage implements OnInit, OnDestroy {
     return this.todayMedicationDoses.filter((dose) => dose.status === 'taken');
   }
 
+  get todayMedicationActionableDoses(): MedicationDose[] {
+    return [...this.todayMedicationOverdueDoses, ...this.todayMedicationPendingDoses];
+  }
+
+  get visibleTodayMedicationOverdueDoses(): MedicationDose[] {
+    return this.medicationHomeExpanded
+      ? this.todayMedicationOverdueDoses
+      : this.todayMedicationOverdueDoses.slice(0, 1);
+  }
+
+  get visibleTodayMedicationPendingDoses(): MedicationDose[] {
+    if (this.medicationHomeExpanded) return this.todayMedicationPendingDoses;
+    return this.todayMedicationOverdueDoses.length === 0
+      ? this.todayMedicationPendingDoses.slice(0, 1)
+      : [];
+  }
+
+  get hiddenTodayMedicationDoseCount(): number {
+    return Math.max(0, this.todayMedicationActionableDoses.length - 1);
+  }
+
+  toggleMedicationHomeExpanded(): void {
+    this.medicationHomeExpanded = !this.medicationHomeExpanded;
+  }
+
   get todayMedicationProgress(): number {
     if (this.todayMedicationDoses.length === 0) return 0;
     return Math.round((this.todayMedicationTakenDoses.length / this.todayMedicationDoses.length) * 100);
-  }
-
-  get selectedDateMedicationDoses(): MedicationDose[] {
-    return this.medicationDoses
-      .filter((dose) => dose.scheduledAt.startsWith(this.selectedDate))
-      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   }
 
   medicationForDose(dose: MedicationDose): MedicationTreatment | undefined {
@@ -2651,6 +2819,20 @@ export class HomePage implements OnInit, OnDestroy {
     return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `subtask-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  private async requestInitialAndroidPermissions(): Promise<void> {
+    if (Capacitor.getPlatform() !== 'android' || localStorage.getItem(this.initialPermissionKey) === 'done') return;
+    localStorage.setItem(this.initialPermissionKey, 'done');
+
+    try {
+      const notificationsGranted = await this.notificationScheduler.requestNotificationPermission();
+      if (notificationsGranted) this.syncNotifications();
+    } catch (error) {
+      console.warn('No fue posible solicitar el permiso de notificaciones.', error);
+    }
+
+    await this.deviceCalendarService.requestInitialPermissions();
   }
 
   async abrirConfiguracionBateria(): Promise<void> {
@@ -3107,6 +3289,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaFecha = fecha;
     this.nuevaHora = '';
     this.nuevaHoraFin = '';
+    this.taskScheduleEnabled = false;
     this.taskSubtasks = [];
     this.newSubtaskTitle = '';
     this.eventColor = '#2563eb';
@@ -3122,6 +3305,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaFecha = tarea.fecha ?? '';
     this.nuevaHora = tarea.hora ?? '';
     this.nuevaHoraFin = this.taskEndTime(tarea);
+    this.taskScheduleEnabled = tarea.tipo === 'tarea' && !!tarea.fecha;
     this.taskSubtasks = tarea.subtasks?.map((subtask) => ({ ...subtask })) ?? [];
     this.newSubtaskTitle = '';
     this.eventColor = tarea.color ?? '#2563eb';
@@ -3149,8 +3333,7 @@ export class HomePage implements OnInit, OnDestroy {
         iso,
         currentMonth: date.getMonth() === month,
         selected: iso === this.selectedDate,
-        hasTasks: this.taskService.hasTasksOnDate(iso, this.calendarTasks) ||
-          this.medicationDoses.some((dose) => dose.scheduledAt.startsWith(iso)),
+        hasTasks: this.taskService.hasTasksOnDate(iso, this.calendarTasks),
       };
     });
   }

@@ -135,6 +135,15 @@ export class DeviceCalendarService {
     }
   }
 
+  async requestInitialPermissions(): Promise<void> {
+    if (!this.supported) return;
+    try {
+      await DeviceCalendarNative.requestPermissions();
+    } catch (error) {
+      console.warn('No fue posible solicitar los permisos de calendario.', error);
+    }
+  }
+
   saveSettings(settings: DeviceCalendarSettings): void {
     localStorage.setItem(this.storageKey, JSON.stringify(settings));
   }

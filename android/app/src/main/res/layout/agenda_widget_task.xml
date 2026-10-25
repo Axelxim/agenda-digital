@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="38dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+    <TextView
+        android:id="@+id/widget_list_task_check"
+        style="@style/AgendaWidgetBullet" />
+    <TextView
+        android:id="@+id/widget_list_task_title"
+        style="@style/AgendaWidgetTitle" />
+    <TextView
+        android:id="@+id/widget_list_task_time"
+        style="@style/AgendaWidgetTime" />
+</LinearLayout>

@@ -5,6 +5,12 @@ import { TaskService } from '../core/task.service';
 import { WalletService } from '../core/wallet.service';
 import { HomePage } from './home.page';
 
+const localIsoDate = (date: Date): string => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0'),
+].join('-');
+
 describe('HomePage', () => {
   let component: HomePage;
   let fixture: ComponentFixture<HomePage>;
@@ -211,18 +217,20 @@ describe('HomePage', () => {
       { ...task(4, 'vencida'), fecha: today, hora: '08:00' },
       { ...task(5), fecha: today },
       { ...task(6), tipo: 'evento', fecha: tomorrow, hora: '18:00', horaFin: '19:00' },
+      { ...task(7), tipo: 'evento', fecha: upcoming, hora: '18:00', horaFin: '19:00' },
     ]).filter((section) => section.tareas.length > 0);
 
     expect(component.visibleSections.map((section) => section.id)).toEqual([
       'sin-fecha',
-      'proximas',
       'manana',
+      'proximas',
       'vencidas',
     ]);
-    expect(component.visibleSections.flatMap((section) => section.tareas).map((item) => item.id)).toEqual([1, 3, 6, 2, 4]);
+    expect(component.visibleSections.flatMap((section) => section.tareas).map((item) => item.id)).toEqual([1, 6, 2, 3, 4]);
     expect(component.visibleSections.find((section) => section.id === 'sin-fecha')?.tareas.map((item) => item.id)).toEqual([1]);
     expect(component.visibleSections.find((section) => section.id === 'manana')?.tareas.some((item) => item.tipo === 'evento')).toBe(true);
     expect(service.getSummary(component.secciones.flatMap((section) => section.tareas)).manana).toBe(2);
+    expect(service.getSummary(component.secciones.flatMap((section) => section.tareas)).proximas).toBe(1);
   });
 
   it('keeps only one home task expanded', () => {
@@ -253,6 +261,28 @@ describe('HomePage', () => {
     component.setAdvancedModeEnabled(false);
   });
 
+  it('keeps task date and time optional behind their controls', () => {
+    component.nuevaTarea();
+    expect(component.taskScheduleEnabled).toBe(false);
+    expect(component.nuevaFecha).toBe(localIsoDate(new Date()));
+
+    component.setTaskScheduleEnabled(true);
+    expect(component.taskSchedulingInvalid).toBe(false);
+
+    component.nuevaHora = '09:00';
+    expect(component.taskSchedulingInvalid).toBe(false);
+
+    component.setTaskScheduleEnabled(false);
+    expect(component.nuevaFecha).toBe('');
+    expect(component.nuevaHora).toBe('');
+  });
+
+  it('starts new events on today when opened without a calendar date', () => {
+    component.nuevoEvento();
+
+    expect(component.nuevaFecha).toBe(localIsoDate(new Date()));
+  });
+
   it('classifies the task tabs without mixing events or states', () => {
     component.tareas = [
       task(1),
@@ -260,6 +290,7 @@ describe('HomePage', () => {
       { ...task(3, 'vencida'), fecha: '2026-10-22' },
       task(4, 'completada'),
       { ...task(5), tipo: 'evento', fecha: '2026-10-24' },
+      { ...task(6, 'ignorada'), fecha: '2026-10-21' },
     ];
 
     component.pendingFilter = 'pendientes';
@@ -267,7 +298,7 @@ describe('HomePage', () => {
     component.pendingFilter = 'programadas';
     expect(component.filteredTasks.map((item) => item.id)).toEqual([2]);
     component.pendingFilter = 'vencidas';
-    expect(component.filteredTasks.map((item) => item.id)).toEqual([3]);
+    expect(component.filteredTasks.map((item) => item.id)).toEqual([3, 6]);
     component.pendingFilter = 'completadas';
     expect(component.filteredTasks.map((item) => item.id)).toEqual([4]);
   });
@@ -320,14 +351,56 @@ describe('HomePage', () => {
       { id: 'overdue', treatmentId: 'medicine', scheduledAt: '2026-10-24T08:00:00', status: 'pending' },
       { id: 'taken', treatmentId: 'medicine', scheduledAt: '2026-10-24T09:00:00', status: 'taken', recordedAt: '2026-10-24T09:05:00' },
       { id: 'pending', treatmentId: 'medicine', scheduledAt: '2026-10-24T11:00:00', status: 'pending' },
+      { id: 'pending-later', treatmentId: 'medicine', scheduledAt: '2026-10-24T18:00:00', status: 'pending' },
       { id: 'tomorrow', treatmentId: 'medicine', scheduledAt: '2026-10-25T08:00:00', status: 'pending' },
     ];
 
     expect(component.todayMedicationOverdueDoses.map((dose) => dose.id)).toEqual(['overdue']);
-    expect(component.todayMedicationPendingDoses.map((dose) => dose.id)).toEqual(['pending']);
+    expect(component.todayMedicationPendingDoses.map((dose) => dose.id)).toEqual(['pending', 'pending-later']);
     expect(component.todayMedicationTakenDoses.map((dose) => dose.id)).toEqual(['taken']);
-    expect(component.todayMedicationProgress).toBe(33);
+    expect(component.todayMedicationProgress).toBe(25);
     expect(component.medicationDoseRecordedTime(component.todayMedicationTakenDoses[0])).toContain('09:05');
+    expect(component.visibleTodayMedicationOverdueDoses.map((dose) => dose.id)).toEqual(['overdue']);
+    expect(component.visibleTodayMedicationPendingDoses).toEqual([]);
+    expect(component.hiddenTodayMedicationDoseCount).toBe(2);
+
+    component.toggleMedicationHomeExpanded();
+    expect(component.visibleTodayMedicationPendingDoses.map((dose) => dose.id)).toEqual(['pending', 'pending-later']);
+  });
+
+  it('keeps medication doses out of the calendar', () => {
+    component.currentTime = new Date('2026-10-24T10:00:00');
+    component.currentMonth = new Date('2026-10-01T00:00:00');
+    component.tareas = [];
+    component.deviceCalendarTasks = [];
+    const treatment = {
+      dose: '1 tableta',
+      startDate: '2026-10-24',
+      schedule: { days: [0, 1, 2, 3, 4, 5, 6], times: ['08:00'] },
+      color: '#22c55e',
+      strictTracking: false,
+      stockEnabled: false,
+      stockQuantity: 0,
+      doseUnits: 1,
+      stockUnit: 'tabletas',
+      lowStockThreshold: 5,
+      status: 'active' as const,
+      createdAt: '2026-10-24T00:00:00.000Z',
+      updatedAt: '2026-10-24T00:00:00.000Z',
+    };
+    component.medicationTreatments = [
+      { ...treatment, id: 'continuous', name: 'Citalopram', continuous: true },
+      { ...treatment, id: 'temporary', name: 'Antibiótico', continuous: false, endDate: '2026-10-30' },
+    ];
+    component.medicationDoses = [
+      { id: 'continuous-dose', treatmentId: 'continuous', scheduledAt: '2026-10-24T08:00:00', status: 'pending' },
+      { id: 'temporary-dose', treatmentId: 'temporary', scheduledAt: '2026-10-24T09:00:00', status: 'pending' },
+    ];
+
+    component.selectDate('2026-10-24');
+
+    expect(component.calendarDays.find((day) => day.iso === '2026-10-24')?.hasTasks).toBe(false);
+    expect(component.todayMedicationDoses.map((dose) => dose.id)).toContain('continuous-dose');
   });
 
   it('groups medicines by treatment reference', () => {

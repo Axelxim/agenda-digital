@@ -105,20 +105,34 @@
       }
     </section>
 
-    @if (wellnessSettings.enabled && todayMedicationDoses.length > 0) {
+    @if (wellnessSettings.enabled && todayMedicationActionableDoses.length > 0) {
     <section class="task-section medication-home-section" aria-label="Medicamentos de hoy">
       <div class="section-heading home-section-heading">
         <div><ion-icon name="medical-outline"></ion-icon><h2>Tomas de hoy</h2></div>
         <span>{{ todayMedicationTakenDoses.length }} de {{ todayMedicationDoses.length }}</span>
       </div>
       <div class="medication-day-progress" [attr.aria-label]="todayMedicationTakenDoses.length + ' de ' + todayMedicationDoses.length + ' tomas registradas'">
-        <span><i [style.width.%]="todayMedicationProgress"></i></span><small>{{ todayMedicationProgress }}%</small>
+        <span class="medication-progress-track"><i [style.width.%]="todayMedicationProgress"></i></span>
+        <span class="medication-progress-actions">
+          <small>{{ todayMedicationProgress }}%</small>
+          @if (todayMedicationActionableDoses.length > 1) {
+          <button
+            type="button"
+            [attr.aria-label]="medicationHomeExpanded ? 'Mostrar solo la próxima toma' : 'Mostrar las demás tomas'"
+            [attr.title]="medicationHomeExpanded ? 'Mostrar solo la próxima' : 'Mostrar las demás tomas'"
+            [attr.aria-expanded]="medicationHomeExpanded"
+            (click)="toggleMedicationHomeExpanded()"
+          >
+            <ion-icon name="chevron-down-outline" [class.expanded]="medicationHomeExpanded"></ion-icon>
+          </button>
+          }
+        </span>
       </div>
 
-      @if (todayMedicationOverdueDoses.length > 0) {
+      @if (visibleTodayMedicationOverdueDoses.length > 0) {
       <div class="medication-dose-group overdue-group">
         <h3><ion-icon name="alert-circle-outline"></ion-icon>Atrasadas <span>{{ todayMedicationOverdueDoses.length }}</span></h3>
-        @for (dose of todayMedicationOverdueDoses; track dose.id) {
+        @for (dose of visibleTodayMedicationOverdueDoses; track dose.id) {
         @if (medicationForDose(dose); as treatment) {
         <article class="medication-dose-card overdue" [style.--treatment-color]="treatment.color">
           <ion-checkbox [checked]="false" (ionChange)="toggleMedicationDose(dose)" [attr.aria-label]="'Registrar toma ' + treatment.name"></ion-checkbox>
@@ -130,10 +144,10 @@
       </div>
       }
 
-      @if (todayMedicationPendingDoses.length > 0) {
+      @if (visibleTodayMedicationPendingDoses.length > 0) {
       <div class="medication-dose-group">
         <h3><ion-icon name="time-outline"></ion-icon>Pendientes <span>{{ todayMedicationPendingDoses.length }}</span></h3>
-        @for (dose of todayMedicationPendingDoses; track dose.id) {
+        @for (dose of visibleTodayMedicationPendingDoses; track dose.id) {
         @if (medicationForDose(dose); as treatment) {
         <article class="medication-dose-card" [style.--treatment-color]="treatment.color">
           <ion-checkbox [checked]="false" (ionChange)="toggleMedicationDose(dose)" [attr.aria-label]="'Registrar toma ' + treatment.name"></ion-checkbox>
@@ -145,20 +159,6 @@
       </div>
       }
 
-      @if (todayMedicationTakenDoses.length > 0) {
-      <div class="medication-dose-group taken-group">
-        <h3><ion-icon name="checkmark-circle-outline"></ion-icon>Tomadas <span>{{ todayMedicationTakenDoses.length }}</span></h3>
-        @for (dose of todayMedicationTakenDoses; track dose.id) {
-        @if (medicationForDose(dose); as treatment) {
-        <article class="medication-dose-card done" [style.--treatment-color]="treatment.color">
-          <ion-checkbox [checked]="true" (ionChange)="toggleMedicationDose(dose)" [attr.aria-label]="'Marcar pendiente ' + treatment.name"></ion-checkbox>
-          <span><strong>{{ treatment.name }}</strong><small>{{ medicationDoseTime(dose) }} · {{ treatment.dose }}</small><small class="medication-dose-state">Tomada a las {{ medicationDoseRecordedTime(dose) }}</small>@if (treatment.stockEnabled) {<small class="medication-stock" [class.low]="isMedicationLowStock(treatment)">{{ medicationStockLabel(treatment) }}</small>}</span>
-          <ion-icon name="checkmark-circle-outline"></ion-icon>
-        </article>
-        }
-        }
-      </div>
-      }
     </section>
     }
 
@@ -268,19 +268,6 @@
       }
       }
 
-      @if (selectedDateMedicationDoses.length > 0) {
-      <div class="calendar-medication-list" aria-label="Medicamentos del día">
-        @for (dose of selectedDateMedicationDoses; track dose.id) {
-        @if (medicationForDose(dose); as treatment) {
-        <article class="calendar-medication-dose" [class.done]="dose.status === 'taken'" [class.overdue]="isMedicationDoseOverdue(dose)" [style.--treatment-color]="treatment.color">
-          <ion-icon name="medical-outline"></ion-icon><strong>{{ medicationDoseTime(dose) }} · {{ treatment.name }}</strong><small>{{ treatment.dose }}</small>
-          @if (dose.status === 'taken') { <ion-icon class="dose-status" name="checkbox-outline" aria-label="Toma registrada"></ion-icon> }
-        </article>
-        }
-        }
-      </div>
-      }
-
       <div #agendaTimeline class="agenda-timeline" [class.has-birthday]="birthdayEventsForSelectedDate.length > 0" [style.--hour-height.px]="agendaHourHeight" aria-label="Horas del día">
         @for (hour of agendaHours; track hour) {
         <div class="time-slot" [class.current-hour]="isCurrentHour(hour)">
@@ -354,18 +341,6 @@
       </div>
       <section class="month-events" aria-live="polite">
         <div class="section-heading"><h2>Eventos del {{ formatDate(selectedDate) }}</h2></div>
-        @if (selectedDateMedicationDoses.length > 0) {
-        <div class="calendar-medication-list month-medications">
-          @for (dose of selectedDateMedicationDoses; track dose.id) {
-          @if (medicationForDose(dose); as treatment) {
-          <article class="calendar-medication-dose" [class.done]="dose.status === 'taken'" [class.overdue]="isMedicationDoseOverdue(dose)" [style.--treatment-color]="treatment.color">
-            <ion-icon name="medical-outline"></ion-icon><strong>{{ medicationDoseTime(dose) }} · {{ treatment.name }}</strong><small>{{ treatment.dose }}</small>
-            @if (dose.status === 'taken') { <ion-icon class="dose-status" name="checkbox-outline" aria-label="Toma registrada"></ion-icon> }
-          </article>
-          }
-          }
-        </div>
-        }
         @if (selectedDateTasks.length > 0) {
         <div class="month-event-list">
           @for (tarea of selectedDateTasks; track tarea.id) {
@@ -478,8 +453,8 @@
       </button>
       }
       <button type="button" class="preset-entry" (click)="abrirPreestablecidos()">
-        <span class="preset-entry-icon"><ion-icon name="calendar-outline"></ion-icon></span>
-        <span><strong>Eventos preestablecidos</strong><small>Crea y administra tus horarios guardados</small></span>
+        <span class="preset-entry-icon"><ion-icon name="repeat-outline"></ion-icon></span>
+        <span><strong>Rutinas</strong><small>{{ preestablecidos.length }} {{ preestablecidos.length === 1 ? 'rutina guardada' : 'rutinas guardadas' }}</small></span>
         <ion-icon name="chevron-forward-outline"></ion-icon>
       </button>
       <button type="button" class="preset-entry" (click)="abrirConfiguracion()">
@@ -517,12 +492,12 @@
         <label class="editor-field">
           <span class="editor-label">Inicio</span>
           <ion-icon name="time-outline"></ion-icon>
-          <ion-input type="time" [(ngModel)]="nuevaHora"></ion-input>
+          <ion-input type="time" [(ngModel)]="nuevaHora" (ionChange)="focusEndTime(eventEndTimeInput)"></ion-input>
         </label>
         <label class="editor-field">
           <span class="editor-label">Fin</span>
           <ion-icon name="time-outline"></ion-icon>
-          <ion-input type="time" [(ngModel)]="nuevaHoraFin"></ion-input>
+          <ion-input #eventEndTimeInput type="time" [(ngModel)]="nuevaHoraFin"></ion-input>
         </label>
       </div>
       @if (timeRangeInvalid) { <p class="time-validation">La hora de fin debe ser posterior a la de inicio.</p> }
@@ -622,7 +597,7 @@
   </ion-fab>
   }
 
-  <ion-modal cssClass="task-editor-modal">
+  <ion-modal id="task-editor-modal" cssClass="task-editor-modal">
     <ng-template>
       <header class="event-editor-header task-editor-header">
         <button type="button" aria-label="Volver" (click)="cerrarModal()">
@@ -632,7 +607,7 @@
         <button
           type="button"
           class="editor-save"
-          [disabled]="(formMode !== 'reschedule' && !nuevoTitulo.trim()) || timeRangeInvalid"
+          [disabled]="(formMode !== 'reschedule' && !nuevoTitulo.trim()) || timeRangeInvalid || taskSchedulingInvalid"
           (click)="guardarFormulario()"
         >
           Guardar
@@ -651,7 +626,7 @@
 
           @if (formItemType === 'evento' && formMode !== 'reschedule' && preestablecidos.length > 0) {
           <div class="event-templates">
-            <span>Eventos rápidos</span>
+            <span>Rutinas guardadas</span>
             <div>
               @for (preset of preestablecidos; track preset.id) {
               <button type="button" [style.border-color]="preset.color" (click)="applyEventPreset(preset)">
@@ -691,23 +666,43 @@
           </div>
           }
 
+          @if (formItemType === 'tarea') {
+          <div class="task-schedule-option">
+            <span><strong>Programar tarea</strong><small>Agregar una fecha</small></span>
+            <ion-toggle
+              [checked]="taskScheduleEnabled"
+              aria-label="Programar tarea"
+              (ionChange)="setTaskScheduleEnabled($event.detail.checked)"
+            ></ion-toggle>
+          </div>
+          }
+
+          @if (formItemType === 'evento' || taskScheduleEnabled) {
           <ion-input
             label="Fecha"
             label-placement="stacked"
             type="date"
             [(ngModel)]="nuevaFecha"
           ></ion-input>
+          }
 
+          @if (formItemType === 'tarea' && taskScheduleEnabled) {
+          <p class="task-optional-time-label">Horario <span>(opcional)</span></p>
+          }
+
+          @if (formItemType === 'evento' || taskScheduleEnabled) {
           <div class="time-range">
             <ion-input
-              label="Hora de inicio"
+              [label]="formItemType === 'tarea' ? 'Inicio' : 'Hora de inicio'"
               label-placement="stacked"
               type="time"
               [(ngModel)]="nuevaHora"
+              (ionChange)="focusEndTime(taskEndTimeInput)"
             ></ion-input>
 
             <ion-input
-              label="Hora de fin"
+              #taskEndTimeInput
+              [label]="formItemType === 'tarea' ? 'Fin' : 'Hora de fin'"
               label-placement="stacked"
               type="time"
               [(ngModel)]="nuevaHoraFin"
@@ -715,6 +710,7 @@
           </div>
           @if (timeRangeInvalid) {
           <p class="time-validation">La hora de fin debe ser posterior a la de inicio.</p>
+          }
           }
 
           @if (formMode !== 'reschedule') {
@@ -732,6 +728,7 @@
             }
           </ion-select>
 
+          @if (advancedModeEnabled) {
           <ion-select
             label="Actividad madre"
             label-placement="stacked"
@@ -746,7 +743,6 @@
             }
           </ion-select>
 
-          @if (advancedModeEnabled) {
           <section class="subtask-editor" aria-label="Subtareas">
             <div class="subtask-editor-heading"><strong>Subtareas</strong><span>{{ taskSubtasks.length }}</span></div>
             @if (taskSubtasks.length > 0) {
@@ -768,6 +764,7 @@
           }
           }
 
+          @if (formItemType === 'evento' || taskScheduleEnabled) {
           <ion-select
             label="Repetir"
             label-placement="stacked"
@@ -778,6 +775,7 @@
             <ion-select-option value="weekly">Semanal</ion-select-option>
             <ion-select-option value="monthly">Mensual</ion-select-option>
           </ion-select>
+          }
 
           }
 
@@ -797,37 +795,48 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #presetModal cssClass="settings-reminder-modal presets-modal">
+  <ion-modal id="routines-modal" #presetModal cssClass="settings-reminder-modal presets-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
-          <ion-title>Eventos preestablecidos</ion-title>
-          <ion-buttons slot="end"><ion-button fill="clear" (click)="cerrarPreestablecidos()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons>
+          <ion-title>Rutinas</ion-title>
+          <ion-buttons slot="end"><ion-button fill="clear" aria-label="Cerrar rutinas" (click)="cerrarPreestablecidos()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons>
         </ion-toolbar>
       </ion-header>
       <ion-content class="modal-content">
         <section class="preset-manager modal-preset-manager">
-          <p>Crea plantillas para escuela, trabajo, gym u otras actividades.</p>
+          @if (!routineEditorOpen) {
+          <button type="button" class="routine-add-button" (click)="nuevaRutina()">
+            <ion-icon name="add"></ion-icon><span>Nueva rutina</span>
+          </button>
+          @if (preestablecidos.length > 0) {
+          <div class="preset-list">@for (preset of preestablecidos; track preset.id) {<div class="preset-row"><span class="label-dot" [style.background]="preset.color"></span><div><strong>{{ preset.nombre }}</strong><small>{{ preset.horaInicio }} – {{ preset.horaFin }} · {{ preset.dias.length ? preset.dias.length + ' días' : 'Sin días' }}</small></div><button type="button" (click)="editarPreestablecido(preset)">Editar</button></div>}</div>
+          } @else {
+          <div class="routine-empty-state"><ion-icon name="repeat-outline"></ion-icon><strong>Sin rutinas</strong><span>Agrega una actividad que se repita durante la semana.</span></div>
+          }
+          } @else {
+          <div class="routine-editor-heading">
+            <strong>{{ editingPresetId === null ? 'Nueva rutina' : 'Editar rutina' }}</strong>
+            <span>Asigna sus días y horarios.</span>
+          </div>
           <div class="preset-form">
-            <ion-input label="Nombre del evento" label-placement="stacked" placeholder="Ej. Escuela" [(ngModel)]="presetNombre"></ion-input>
+            <ion-input label="Nombre de la rutina" label-placement="stacked" placeholder="Ej. Estudiar o ir al gimnasio" [(ngModel)]="presetNombre"></ion-input>
             <div class="time-range">
               <ion-input label="Hora de inicio" label-placement="stacked" type="time" [(ngModel)]="presetHoraInicio" (ngModelChange)="actualizarHorarioPreestablecido()"></ion-input>
               <ion-input label="Hora de fin" label-placement="stacked" type="time" [(ngModel)]="presetHoraFin" (ngModelChange)="actualizarHorarioPreestablecido()"></ion-input>
             </div>
             <label class="color-picker">Color <input type="color" [(ngModel)]="presetColor" /></label>
             <div class="day-picker"><span>Días — toca uno para asignar su horario</span><div>@for (day of diasSemana; track day; let index = $index) {<button type="button" class="day-button" [style.background-color]="presetDias.includes(index) ? '#2563eb' : '#171b24'" [style.border-color]="presetDias.includes(index) ? '#60a5fa' : '#344054'" [style.color]="presetDias.includes(index) ? '#ffffff' : '#a5b0c3'" (click)="togglePresetDay(index)">{{ day }}</button>}</div>@if (presetActiveDay !== null) {<button type="button" class="remove-day" (click)="quitarDiaPreestablecido()">Quitar día seleccionado</button>}</div>
-            <ion-button (click)="guardarPreestablecido()" [disabled]="!presetNombre.trim()">{{ editingPresetId === null ? 'Guardar preestablecido' : 'Guardar cambios' }}</ion-button>
-            @if (editingPresetId !== null) {<ion-button fill="outline" (click)="cancelarEdicionPreestablecido()">Cancelar edición</ion-button>}
+            <ion-button (click)="guardarPreestablecido()" [disabled]="!presetNombre.trim()">{{ editingPresetId === null ? 'Guardar rutina' : 'Guardar cambios' }}</ion-button>
+            <ion-button fill="outline" (click)="cancelarEdicionPreestablecido()">Cancelar</ion-button>
           </div>
-          @if (preestablecidos.length > 0) {
-          <div class="preset-list">@for (preset of preestablecidos; track preset.id) {<div class="preset-row"><span class="label-dot" [style.background]="preset.color"></span><div><strong>{{ preset.nombre }}</strong><small>{{ preset.horaInicio }} – {{ preset.horaFin }} · {{ preset.dias.length ? preset.dias.length + ' días' : 'Sin días' }}</small></div><button type="button" (click)="editarPreestablecido(preset)">Editar</button></div>}</div>
           }
         </section>
       </ion-content>
     </ng-template>
   </ion-modal>
 
-  <ion-modal #wellnessModal cssClass="settings-reminder-modal wellness-modal">
+  <ion-modal id="wellness-modal" #wellnessModal cssClass="settings-reminder-modal wellness-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -899,7 +908,7 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #treatmentsModal cssClass="settings-reminder-modal treatments-manager-modal">
+  <ion-modal id="treatments-modal" #treatmentsModal cssClass="settings-reminder-modal treatments-manager-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -907,7 +916,12 @@
           <ion-buttons slot="start"><ion-button fill="clear" aria-label="Volver a tratamientos" (click)="cerrarHistorialTratamiento()"><ion-icon name="chevron-back-outline"></ion-icon></ion-button></ion-buttons>
           }
           <ion-title>{{ selectedHistoryGroup ? 'Historial' : 'Mis tratamientos' }}</ion-title>
-          <ion-buttons slot="end"><ion-button fill="clear" aria-label="Cerrar tratamientos" (click)="cerrarTratamientos()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons>
+          <ion-buttons slot="end">
+            @if (!selectedHistoryGroup) {
+            <ion-button fill="clear" aria-label="Agregar tratamiento" (click)="agregarTratamientoDesdeAdministrador()"><ion-icon name="add"></ion-icon></ion-button>
+            }
+            <ion-button fill="clear" aria-label="Cerrar tratamientos" (click)="cerrarTratamientos()"><ion-icon name="close"></ion-icon></ion-button>
+          </ion-buttons>
         </ion-toolbar>
       </ion-header>
       <ion-content class="modal-content">
@@ -994,7 +1008,7 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #globalSearchModal cssClass="settings-reminder-modal global-search-modal">
+  <ion-modal id="global-search-modal" #globalSearchModal cssClass="settings-reminder-modal global-search-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -1026,7 +1040,7 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #notesModal cssClass="settings-reminder-modal quick-notes-modal">
+  <ion-modal id="notes-modal" #notesModal cssClass="settings-reminder-modal quick-notes-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -1082,7 +1096,7 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #walletModal cssClass="settings-reminder-modal wallet-modal">
+  <ion-modal id="wallet-modal" #walletModal cssClass="settings-reminder-modal wallet-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -1126,7 +1140,7 @@
           <div class="wallet-section"><div class="wallet-section-title"><h2>Gastos fijos</h2><span>{{ walletState.fixedExpenses.length }}</span></div>
             @if (walletState.fixedExpenses.length === 0) { <p class="wallet-empty">No hay gastos fijos registrados.</p> }
             @for (expense of walletState.fixedExpenses; track expense.id) {
-            <button type="button" class="wallet-fixed-row" (click)="nuevoGastoFijo(expense)"><span><strong>{{ expense.name }}</strong><small>Día {{ expense.dueDay }} · {{ expense.frequencyMonths === 2 ? 'Bimestral' : 'Mensual' }} · {{ expense.category }}</small></span><b>{{ walletMoney(expense.amount) }}</b><ion-icon name="pencil-outline"></ion-icon></button>
+            <button type="button" class="wallet-fixed-row" (click)="nuevoGastoFijo(expense)"><span><strong>{{ expense.name }}</strong><small>{{ expense.frequencyMonths === 2 ? ('Cada 2 meses desde ' + formatDate(expense.firstDueDate)) : ('Día ' + expense.dueDay + ' · Mensual') }} · {{ expense.category }}</small></span><b>{{ walletMoney(expense.amount) }}</b><ion-icon name="pencil-outline"></ion-icon></button>
             }
           </div>
 
@@ -1166,8 +1180,15 @@
             <ion-select label="Categoría" label-placement="stacked" [(ngModel)]="fixedExpenseCategory">@for (category of walletCategories; track category) { <ion-select-option [value]="category">{{ category }}</ion-select-option> }</ion-select>
             <ion-select label="Frecuencia" label-placement="stacked" [(ngModel)]="fixedExpenseFrequencyMonths"><ion-select-option [value]="1">Mensual</ion-select-option><ion-select-option [value]="2">Bimestral</ion-select-option></ion-select>
           </div>
-          <div class="wallet-form-row"><ion-input label="Día de vencimiento" label-placement="stacked" type="number" min="1" max="31" [(ngModel)]="fixedExpenseDueDay"></ion-input><ion-input label="Hora del aviso" label-placement="stacked" type="time" [(ngModel)]="fixedExpenseReminderTime"></ion-input></div>
-          <button type="button" class="wallet-primary" [disabled]="!fixedExpenseName.trim() || !fixedExpenseAmount || fixedExpenseAmount <= 0" (click)="guardarGastoFijo()">Guardar gasto fijo</button>
+          <div class="wallet-form-row">
+            @if (fixedExpenseFrequencyMonths === 2) {
+            <ion-input label="Primer vencimiento" label-placement="stacked" type="date" [(ngModel)]="fixedExpenseFirstDueDate"></ion-input>
+            } @else {
+            <ion-input label="Día de vencimiento" label-placement="stacked" type="number" min="1" max="31" [(ngModel)]="fixedExpenseDueDay"></ion-input>
+            }
+            <ion-input label="Hora del aviso" label-placement="stacked" type="time" [(ngModel)]="fixedExpenseReminderTime"></ion-input>
+          </div>
+          <button type="button" class="wallet-primary" [disabled]="!fixedExpenseName.trim() || !fixedExpenseAmount || fixedExpenseAmount <= 0 || (fixedExpenseFrequencyMonths === 2 && !fixedExpenseFirstDueDate)" (click)="guardarGastoFijo()">Guardar gasto fijo</button>
           @if (editingFixedExpenseId) { <button type="button" class="wallet-danger" (click)="eliminarGastoFijo(editingFixedExpenseId)">Eliminar gasto fijo</button> }
         </section>
         }
@@ -1196,7 +1217,7 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #settingsModal cssClass="settings-reminder-modal">
+  <ion-modal id="settings-modal" #settingsModal cssClass="settings-reminder-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -1271,7 +1292,7 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #batteryModal cssClass="settings-reminder-modal">
+  <ion-modal id="battery-modal" #batteryModal cssClass="settings-reminder-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -1313,7 +1334,7 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #deviceCalendarModal cssClass="settings-reminder-modal">
+  <ion-modal id="device-calendar-modal" #deviceCalendarModal cssClass="settings-reminder-modal">
     <ng-template>
       <ion-header>
         <ion-toolbar>
@@ -1383,6 +1404,7 @@
       </ion-content>
     </ng-template>
   </ion-modal>
+
 </ion-content>
 
 @if (!eventEditorOpen) {
@@ -1456,6 +1478,7 @@
     class="home-task-card"
     [class.expanded]="isTaskActionsExpanded(tarea)"
     [class.expired]="tarea.estado === 'vencida'"
+    [class.ignored]="tarea.estado === 'ignorada'"
     [class.done]="tarea.estado === 'completada'"
     [class.priority-high]="tarea.prioridad === 'alta'"
     [class.priority-medium]="tarea.prioridad === 'media'"
@@ -1466,6 +1489,7 @@
     <div class="home-task-summary">
       <ion-checkbox
         [checked]="tarea.estado === 'completada'"
+        [disabled]="tarea.estado === 'ignorada'"
         (click)="$event.stopPropagation()"
         (ionChange)="cambiarEstado(tarea)"
         [attr.aria-label]="(tarea.estado === 'completada' ? 'Marcar como pendiente ' : 'Completar ') + tarea.titulo"
@@ -1473,7 +1497,7 @@
 
       <div class="home-task-info">
         <h3>{{ tarea.titulo }}</h3>
-        @if (tarea.hora || tarea.etiqueta) {
+        @if (tarea.hora || tarea.etiqueta || tarea.estado === 'ignorada') {
         <div class="home-task-meta">
           @if (tarea.hora) {
           <span>{{ tarea.hora }} – {{ taskEndTime(tarea) }}</span>
@@ -1483,6 +1507,9 @@
           }
           @if (tarea.etiqueta) {
           <span class="home-task-label"><i></i>{{ tarea.etiqueta }}</span>
+          }
+          @if (tarea.estado === 'ignorada') {
+          <span class="ignored-task-note">Ignorada</span>
           }
         </div>
         }
@@ -1515,7 +1542,7 @@
     </div>
     }
     <div class="home-task-actions">
-      @if (tarea.estado !== 'vencida') {
+      @if (tarea.estado !== 'vencida' && tarea.estado !== 'ignorada') {
       <button type="button" (click)="editTaskFromHome(tarea)" [attr.aria-label]="'Editar ' + tarea.titulo">
         <ion-icon name="pencil-outline"></ion-icon><span>Editar</span>
       </button>
@@ -1523,9 +1550,11 @@
       <button type="button" (click)="rescheduleTaskFromHome(tarea)" [attr.aria-label]="'Reagendar ' + tarea.titulo">
         <span class="reschedule-icon"><ion-icon name="calendar-outline"></ion-icon><ion-icon name="time-outline"></ion-icon></span><span>Reagendar</span>
       </button>
+      @if (tarea.estado !== 'ignorada') {
       <button type="button" class="discard-action" (click)="discardTaskFromHome(tarea)" [attr.aria-label]="'Descartar ' + tarea.titulo">
         <ion-icon name="trash-outline"></ion-icon><span>Descartar</span>
       </button>
+      }
     </div>
     }
   </article>
