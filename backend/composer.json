@@ -12,7 +12,8 @@
     "require": {
         "php": "^8.2",
         "codeigniter4/framework": "^4.7",
-        "codeigniter4/shield": "^1.4"
+        "codeigniter4/shield": "^1.4",
+        "google/apiclient": "2.20"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9",

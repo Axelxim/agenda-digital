@@ -13,24 +13,24 @@ $RECYCLE.BIN/
 log.txt
 
 
-/.sourcemaps
-/.versions
-/coverage
+/frontend/.sourcemaps
+/frontend/.versions
+/frontend/coverage
 
 # Ionic
-/.ionic
-/www
-/platforms
-/plugins
+/frontend/.ionic
+/frontend/www
+/frontend/platforms
+/frontend/plugins
 
 # Compiled output
-/dist
-/tmp
-/out-tsc
-/bazel-out
+/frontend/dist
+/frontend/tmp
+/frontend/out-tsc
+/frontend/bazel-out
 
 # Node
-/node_modules
+/frontend/node_modules
 npm-debug.log
 yarn-error.log
 
@@ -54,13 +54,13 @@ yarn-error.log
 
 
 # Miscellaneous
-/.angular
-/.angular/cache
+/frontend/.angular
+/frontend/.angular/cache
 .sass-cache/
 /.nx
 /.nx/cache
 /connect.lock
-/coverage
+/frontend/coverage
 /libpeerconnection.log
 testem.log
 /typings

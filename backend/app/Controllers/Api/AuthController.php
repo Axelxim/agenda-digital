@@ -6,6 +6,7 @@ namespace App\Controllers\Api;
 
 use App\Controllers\BaseController;
 use App\Libraries\Uuid;
+use App\Models\CuentaExternaModel;
 use App\Models\UserProfileModel;
 use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -13,6 +14,7 @@ use CodeIgniter\Shield\Authentication\Authenticators\Session;
 use CodeIgniter\Shield\Entities\User;
 use CodeIgniter\Shield\Exceptions\ValidationException;
 use CodeIgniter\Shield\Models\UserModel;
+use Google\Client as GoogleClient;
 use Throwable;
 
 final class AuthController extends BaseController
@@ -158,6 +160,98 @@ final class AuthController extends BaseController
         return $this->respond($this->authPayload($user, $profile, $token->raw_token));
     }
 
+    public function google(): ResponseInterface
+    {
+        $input = $this->jsonInput();
+        $credential = trim((string) ($input['credential'] ?? ''));
+        if ($credential === '') {
+            return $this->failValidationErrors(['credential' => 'Google no entrego una credencial valida.']);
+        }
+
+        try {
+            $payload = (new GoogleClient(['client_id' => config('GoogleAuth')->clientId]))
+                ->verifyIdToken($credential);
+        } catch (Throwable $exception) {
+            log_message('notice', 'Google rechazo una credencial: {message}', ['message' => $exception->getMessage()]);
+            $payload = false;
+        }
+
+        if (! is_array($payload) || empty($payload['sub']) || empty($payload['email']) || empty($payload['email_verified'])) {
+            return $this->failUnauthorized('La cuenta de Google no pudo verificarse.');
+        }
+
+        $correo = strtolower(trim((string) $payload['email']));
+        $proveedorId = (string) $payload['sub'];
+        $baseDatos = db_connect(config('Auth')->DBGroup);
+        $baseDatos->transBegin();
+
+        try {
+            $cuentas = new CuentaExternaModel();
+            $cuenta = $cuentas->where('proveedor', 'google')->where('proveedor_id', $proveedorId)->first();
+            /** @var UserModel $usuarios */
+            $usuarios = auth()->getProvider();
+
+            if (is_array($cuenta)) {
+                $usuario = $usuarios->findById($cuenta['usuario_id']);
+            } else {
+                $usuario = $usuarios->findByCredentials(['email' => $correo]);
+                if ($usuario instanceof User) {
+                    $baseDatos->transRollback();
+
+                    return $this->failResourceExists('Ya existe una cuenta con ese correo. Inicia sesion con tu contrasena para vincular Google.');
+                }
+
+                $usuario = new User([
+                    'username' => null,
+                    'email' => $correo,
+                    'password' => bin2hex(random_bytes(32)),
+                ]);
+                if (! $usuarios->save($usuario)) {
+                    throw new \RuntimeException('No fue posible crear el usuario de Google.');
+                }
+                $usuario = $usuarios->findById($usuarios->getInsertID());
+                if (! $usuario instanceof User) {
+                    throw new \RuntimeException('No fue posible recuperar el usuario de Google.');
+                }
+                $usuarios->addToDefaultGroup($usuario);
+                $usuario->activate();
+
+                $nombre = trim((string) ($payload['name'] ?? 'Usuario de Google')) ?: 'Usuario de Google';
+                (new UserProfileModel())->insert([
+                    'user_id' => $usuario->id,
+                    'uuid' => Uuid::v4(),
+                    'display_name' => mb_substr($nombre, 0, 100),
+                    'locale' => 'es-MX',
+                    'timezone' => 'America/Mexico_City',
+                ]);
+                $cuentas->insert([
+                    'usuario_id' => $usuario->id,
+                    'proveedor' => 'google',
+                    'proveedor_id' => $proveedorId,
+                    'correo' => $correo,
+                ]);
+            }
+
+            if (! $usuario instanceof User) {
+                throw new \RuntimeException('La cuenta vinculada ya no existe.');
+            }
+            $perfil = (new UserProfileModel())->find($usuario->id);
+            if (! is_array($perfil)) {
+                throw new \RuntimeException('La cuenta de Google no tiene un perfil valido.');
+            }
+
+            $token = $usuario->generateAccessToken($this->deviceName($input), ['sync']);
+            $baseDatos->transCommit();
+
+            return $this->respond($this->authPayload($usuario, $perfil, $token->raw_token));
+        } catch (Throwable $exception) {
+            $baseDatos->transRollback();
+            log_message('error', 'No fue posible iniciar sesion con Google: {message}', ['message' => $exception->getMessage()]);
+
+            return $this->failServerError('No fue posible iniciar sesion con Google.');
+        }
+    }
+
     public function me(): ResponseInterface
     {
         $user = auth('tokens')->user();
@@ -234,7 +328,11 @@ final class AuthController extends BaseController
 
     private function jsonInput(): array
     {
-        $input = $this->request->getJSON(true);
+        try {
+            $input = $this->request->getJSON(true);
+        } catch (Throwable) {
+            return [];
+        }
 
         return is_array($input) ? $input : [];
     }
