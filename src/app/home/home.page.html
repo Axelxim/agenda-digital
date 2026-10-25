@@ -145,20 +145,6 @@
       </div>
       }
 
-      @if (todayMedicationTakenDoses.length > 0) {
-      <div class="medication-dose-group taken-group">
-        <h3><ion-icon name="checkmark-circle-outline"></ion-icon>Tomadas <span>{{ todayMedicationTakenDoses.length }}</span></h3>
-        @for (dose of todayMedicationTakenDoses; track dose.id) {
-        @if (medicationForDose(dose); as treatment) {
-        <article class="medication-dose-card done" [style.--treatment-color]="treatment.color">
-          <ion-checkbox [checked]="true" (ionChange)="toggleMedicationDose(dose)" [attr.aria-label]="'Marcar pendiente ' + treatment.name"></ion-checkbox>
-          <span><strong>{{ treatment.name }}</strong><small>{{ medicationDoseTime(dose) }} · {{ treatment.dose }}</small><small class="medication-dose-state">Tomada a las {{ medicationDoseRecordedTime(dose) }}</small>@if (treatment.stockEnabled) {<small class="medication-stock" [class.low]="isMedicationLowStock(treatment)">{{ medicationStockLabel(treatment) }}</small>}</span>
-          <ion-icon name="checkmark-circle-outline"></ion-icon>
-        </article>
-        }
-        }
-      </div>
-      }
     </section>
     }
 
