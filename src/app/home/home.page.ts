@@ -2523,7 +2523,11 @@ export class HomePage implements OnInit, OnDestroy {
 
   get selectedDateMedicationDoses(): MedicationDose[] {
     return this.medicationDoses
-      .filter((dose) => dose.scheduledAt.startsWith(this.selectedDate))
+      .filter((dose) => {
+        if (!dose.scheduledAt.startsWith(this.selectedDate)) return false;
+        const treatment = this.medicationTreatments.find((item) => item.id === dose.treatmentId);
+        return !!treatment && !treatment.continuous;
+      })
       .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   }
 

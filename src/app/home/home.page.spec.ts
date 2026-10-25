@@ -330,6 +330,37 @@ describe('HomePage', () => {
     expect(component.medicationDoseRecordedTime(component.todayMedicationTakenDoses[0])).toContain('09:05');
   });
 
+  it('hides continuous treatments from the calendar medication list', () => {
+    component.currentTime = new Date('2026-10-24T10:00:00');
+    component.selectedDate = '2026-10-24';
+    const treatment = {
+      dose: '1 tableta',
+      startDate: '2026-10-24',
+      schedule: { days: [0, 1, 2, 3, 4, 5, 6], times: ['08:00'] },
+      color: '#22c55e',
+      strictTracking: false,
+      stockEnabled: false,
+      stockQuantity: 0,
+      doseUnits: 1,
+      stockUnit: 'tabletas',
+      lowStockThreshold: 5,
+      status: 'active' as const,
+      createdAt: '2026-10-24T00:00:00.000Z',
+      updatedAt: '2026-10-24T00:00:00.000Z',
+    };
+    component.medicationTreatments = [
+      { ...treatment, id: 'continuous', name: 'Citalopram', continuous: true },
+      { ...treatment, id: 'temporary', name: 'Antibiótico', continuous: false, endDate: '2026-10-30' },
+    ];
+    component.medicationDoses = [
+      { id: 'continuous-dose', treatmentId: 'continuous', scheduledAt: '2026-10-24T08:00:00', status: 'pending' },
+      { id: 'temporary-dose', treatmentId: 'temporary', scheduledAt: '2026-10-24T09:00:00', status: 'pending' },
+    ];
+
+    expect(component.selectedDateMedicationDoses.map((dose) => dose.id)).toEqual(['temporary-dose']);
+    expect(component.todayMedicationDoses.map((dose) => dose.id)).toContain('continuous-dose');
+  });
+
   it('groups medicines by treatment reference', () => {
     const base = {
       dose: '1 tableta',
