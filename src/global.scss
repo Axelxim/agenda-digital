@@ -38,6 +38,48 @@
 /* @import "@ionic/angular/css/palettes/dark.class.css"; */
 @import '@ionic/angular/css/palettes/dark.system.css';
 
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --soft: #eef3fb;
+  --text: #101828;
+  --muted: #667085;
+  --border: #d8e0eb;
+  --border-strong: #aab6c7;
+  --primary: #0b74ff;
+  --input-bg: #ffffff;
+  --danger-surface: #fff1f2;
+  --danger-border: #fda4af;
+  --success-surface: #ecfdf5;
+  --success-border: #86efac;
+  --warning-surface: #fffbeb;
+  --warning-border: #fcd34d;
+  --primary-surface: #eff6ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #10131a;
+    --surface: #171b24;
+    --soft: #202635;
+    --text: #f4f7fb;
+    --muted: #a5b0c3;
+    --border: #2a3242;
+    --border-strong: #4a5668;
+    --primary: #5aa2ff;
+    --input-bg: #080d14;
+    --danger-surface: #28151c;
+    --danger-border: #8f2638;
+    --success-surface: #10241f;
+    --success-border: #176b54;
+    --warning-surface: #251d12;
+    --warning-border: #9b6721;
+    --primary-surface: #182b47;
+  }
+}
+
 :root,
 body,
 ion-app {
@@ -2563,4 +2605,269 @@ ion-modal.treatments-manager-modal ion-content {
   .wellness-modal .calculation-total { grid-column: 2; text-align: left; }
   .treatments-manager-modal .medication-restock-editor { grid-template-columns: minmax(0, 1fr) 92px; }
   .treatments-manager-modal .medication-restock-editor button { grid-row: 2; }
+}
+
+/* Light palette for controls that originally used fixed dark colors. */
+@media (prefers-color-scheme: light) {
+  app-home .home-section-heading > span,
+  app-home .medication-dose-group h3,
+  app-home .home-task-meta,
+  app-home .task-subtask-progress small,
+  app-home .home-subtask-list label.completed span {
+    color: var(--muted);
+  }
+
+  app-home .home-task-card {
+    border-color: var(--border);
+    border-left-color: var(--priority);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  app-home .home-task-card.expired,
+  app-home .medication-dose-card.overdue,
+  app-home .calendar-medication-dose.overdue {
+    border-color: var(--danger-border);
+    border-left-color: var(--priority, #ff4658);
+    background: var(--danger-surface);
+  }
+
+  app-home .home-task-info h3,
+  app-home .home-subtask-list label {
+    color: var(--text);
+  }
+
+  app-home .medication-day-progress > span,
+  app-home .task-subtask-progress > span {
+    background: var(--soft);
+  }
+
+  app-home .home-task-actions,
+  app-home .home-subtask-list {
+    border-color: var(--border);
+  }
+
+  app-home .home-task-actions button {
+    border-color: var(--border);
+    color: var(--primary);
+  }
+
+  app-home .home-subtask-list {
+    background: color-mix(in srgb, var(--soft) 55%, var(--surface));
+  }
+
+  app-home .reschedule-icon ion-icon:last-child {
+    background: var(--surface);
+  }
+
+  app-home .wallet-due-card,
+  .wallet-modal .wallet-balance-band,
+  .wallet-modal .wallet-payment-reference {
+    border-color: var(--success-border);
+    background: var(--success-surface);
+    color: var(--text);
+  }
+
+  app-home .wallet-due-card.today {
+    border-color: var(--warning-border);
+    background: var(--warning-surface);
+  }
+
+  ion-modal.settings-reminder-modal {
+    --background: var(--bg);
+    color: var(--text);
+    color-scheme: light;
+  }
+
+  ion-modal.settings-reminder-modal::part(content) {
+    border-color: var(--border);
+    box-shadow: 0 18px 44px rgba(15, 23, 42, .18);
+  }
+
+  ion-modal.settings-reminder-modal ion-toolbar {
+    --background: var(--surface);
+    --color: var(--text);
+    border-bottom-color: var(--border);
+  }
+
+  ion-modal.settings-reminder-modal ion-content {
+    --background: var(--bg);
+    --color: var(--text);
+  }
+
+  .settings-reminder-modal :where(h1, h2, h3, label, strong) {
+    color: var(--text);
+  }
+
+  .wallet-modal .wallet-summary-grid,
+  .wallet-modal .wallet-section,
+  .quick-notes-modal .quick-notes-list,
+  .global-search-modal .global-search-results,
+  .settings-reminder-modal .reminder-label-item,
+  .treatments-manager-modal .treatment-group,
+  .treatments-manager-modal .treatment-today-stats,
+  .treatments-manager-modal .medication-history-entry {
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .wallet-modal .wallet-summary-grid > div + div,
+  .wallet-modal .wallet-section-title,
+  .wallet-modal .wallet-list-row,
+  .wallet-modal .wallet-movement-row,
+  .wallet-modal .wallet-fixed-row,
+  .quick-notes-modal .quick-note-item,
+  .quick-notes-modal .quick-note-card-actions,
+  .quick-notes-modal .quick-note-card-actions button + button,
+  .global-search-modal .global-search-results > button,
+  .settings-reminder-modal .reminder-label-editor,
+  .settings-reminder-modal .reminder-setting-row,
+  .settings-reminder-modal .reminder-time-row,
+  .treatments-manager-modal .treatment-group-detail,
+  .treatments-manager-modal .managed-medication {
+    border-color: var(--border);
+  }
+
+  .wallet-modal .wallet-command-row button,
+  .wallet-modal .wallet-kind-switch button,
+  .quick-notes-modal .quick-note-card-actions button,
+  .quick-notes-modal .quick-note-editor-actions > button,
+  .settings-reminder-modal .reminder-lead-options button,
+  .treatments-manager-modal .treatment-group-actions button,
+  .treatments-manager-modal .view-treatment-history,
+  .treatments-manager-modal .medication-history-filters {
+    border-color: var(--border);
+    background: var(--soft);
+    color: var(--primary);
+  }
+
+  .wallet-modal .wallet-list-row,
+  .wallet-modal .wallet-movement-row,
+  .wallet-modal .wallet-fixed-row,
+  .quick-notes-modal .quick-note-content,
+  .global-search-modal .global-search-results > button,
+  .settings-reminder-modal .reminder-label-summary > button,
+  .treatments-manager-modal .treatment-group-summary,
+  .treatments-manager-modal .treatment-draft-card {
+    color: var(--text);
+  }
+
+  .wallet-modal .wallet-form ion-input,
+  .wallet-modal .wallet-form ion-select,
+  .quick-notes-modal .quick-note-editor ion-input,
+  .quick-notes-modal .quick-note-editor ion-textarea,
+  .global-search-modal ion-searchbar,
+  .settings-reminder-modal .reminder-time-row ion-input,
+  .wellness-modal .medication-quick-field ion-input,
+  .wellness-modal .medication-quick-field ion-select,
+  .treatments-manager-modal .medication-restock-editor ion-input {
+    --background: var(--input-bg);
+    --color: var(--text);
+    --placeholder-color: var(--muted);
+    border-color: var(--border-strong);
+    color-scheme: light;
+  }
+
+  .wellness-modal .treatment-date-picker,
+  .wellness-modal .medication-stock-toggle,
+  .wellness-modal .medication-stock-editor,
+  .wellness-modal .treatment-calculation,
+  .wellness-modal .calculated-times > div,
+  .treatments-manager-modal .medication-restock-editor,
+  .treatments-manager-modal .medication-restock-editor button,
+  .treatments-manager-modal .treatment-delete-confirmation button {
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .wellness-modal .treatment-builder-divider,
+  .wellness-modal .treatment-draft-card,
+  .treatments-manager-modal .managed-medication {
+    border-color: var(--border);
+  }
+
+  .wellness-modal .calculation-icon {
+    background: var(--primary-surface);
+    color: var(--primary);
+  }
+
+  .settings-reminder-modal .battery-status,
+  .treatments-manager-modal .treatment-delete-confirmation {
+    border-color: var(--danger-border);
+    background: var(--danger-surface);
+    color: var(--text);
+  }
+
+  .settings-reminder-modal .battery-status.protected {
+    border-color: var(--success-border);
+    background: var(--success-surface);
+  }
+
+  .settings-reminder-modal .battery-status strong,
+  .settings-reminder-modal .battery-oem-note strong,
+  .treatments-manager-modal .treatments-empty strong,
+  .treatments-manager-modal .history-empty strong,
+  .global-search-modal .global-search-empty strong,
+  .quick-notes-modal .quick-notes-empty strong {
+    color: var(--text);
+  }
+
+  .settings-reminder-modal .battery-status small,
+  .settings-reminder-modal .battery-oem-note small,
+  .settings-reminder-modal .reminder-label-summary small,
+  .wallet-modal .wallet-list-row small,
+  .wallet-modal .wallet-movement-row small,
+  .wallet-modal .wallet-fixed-row small,
+  .quick-notes-modal .quick-note-content span,
+  .quick-notes-modal .quick-note-content small,
+  .global-search-modal .global-search-results small,
+  .treatments-manager-modal .managed-medication small,
+  .treatments-manager-modal .history-date small,
+  .treatments-manager-modal .history-medication small {
+    color: var(--muted);
+  }
+
+  app-home .form-stack ion-input,
+  app-home .form-stack ion-select,
+  app-home .editor-field ion-input {
+    --background: var(--surface);
+    --color: var(--text);
+    --placeholder-color: var(--muted);
+    --border-color: var(--border);
+    border-color: var(--border);
+    background: var(--surface);
+    color-scheme: light;
+  }
+
+  app-home .priority-picker button {
+    color: var(--text);
+  }
+
+  app-home .priority-picker button.selected {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+  }
+
+  ion-modal.task-editor-modal {
+    --background: var(--bg);
+    color-scheme: light;
+  }
+
+  ion-modal.task-editor-modal::part(content) {
+    border-color: var(--border);
+    box-shadow: 0 18px 44px rgba(15, 23, 42, .18);
+  }
+
+  .task-editor-modal .task-editor-header,
+  .task-editor-modal .task-editor-header button {
+    color: var(--text);
+  }
+
+  .task-editor-content {
+    --background: var(--bg);
+    --color: var(--text);
+  }
 }
