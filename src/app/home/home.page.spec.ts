@@ -215,11 +215,11 @@ describe('HomePage', () => {
 
     expect(component.visibleSections.map((section) => section.id)).toEqual([
       'sin-fecha',
-      'proximas',
       'manana',
+      'proximas',
       'vencidas',
     ]);
-    expect(component.visibleSections.flatMap((section) => section.tareas).map((item) => item.id)).toEqual([1, 3, 6, 2, 4]);
+    expect(component.visibleSections.flatMap((section) => section.tareas).map((item) => item.id)).toEqual([1, 6, 2, 3, 4]);
     expect(component.visibleSections.find((section) => section.id === 'sin-fecha')?.tareas.map((item) => item.id)).toEqual([1]);
     expect(component.visibleSections.find((section) => section.id === 'manana')?.tareas.some((item) => item.tipo === 'evento')).toBe(true);
     expect(service.getSummary(component.secciones.flatMap((section) => section.tareas)).manana).toBe(2);

@@ -616,8 +616,8 @@ export class HomePage implements OnInit, OnDestroy {
     if (this.selectedView === 'hoy') {
       const homeOrder: TaskSection['id'][] = [
         'sin-fecha',
-        'proximas',
         'manana',
+        'proximas',
         'vencidas',
       ];
       return homeOrder.flatMap((id) =>
