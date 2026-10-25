@@ -31,6 +31,9 @@ log.txt
 
 # Node
 /frontend/node_modules
+/desktop/node_modules
+/desktop/dist
+/desktop/release
 npm-debug.log
 yarn-error.log
 

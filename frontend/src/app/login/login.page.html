@@ -17,16 +17,34 @@
       </div>
 
       <div class="google-area">
-        @if (loading) {
+        @if (desktopTransferComplete) {
+          <div class="desktop-success" role="status">
+            <ion-icon name="shield-checkmark-outline"></ion-icon>
+            <div>
+              <strong>Cuenta conectada</strong>
+              <span>Esta pestaña se cerrará automáticamente. Si el navegador lo impide, puedes cerrarla manualmente.</span>
+            </div>
+          </div>
+        } @else if (isDesktop) {
+          <ion-button expand="block" class="desktop-google-button" [disabled]="signingIn" (click)="startDesktopGoogleLogin()">
+            @if (signingIn) {
+              <ion-spinner slot="start" name="crescent"></ion-spinner>
+              Abriendo el navegador…
+            } @else {
+              Continuar con Google
+            }
+          </ion-button>
+        } @else if (loading) {
           <div class="google-loading"><ion-spinner name="crescent"></ion-spinner><span>Cargando acceso seguro…</span></div>
+        } @else {
+          <div #googleButton class="google-button" [class.hidden]="signingIn"></div>
         }
-        <div #googleButton class="google-button" [class.hidden]="loading || signingIn"></div>
-        @if (signingIn) {
+        @if (signingIn && !isDesktop) {
           <div class="google-loading"><ion-spinner name="crescent"></ion-spinner><span>Verificando tu cuenta…</span></div>
         }
       </div>
 
-      @if (rememberedAccount && !loading && !signingIn) {
+      @if (rememberedAccount && !loading && !signingIn && !desktopTransferComplete) {
         <button type="button" class="change-account" (click)="useAnotherAccount()">
           Usar otra cuenta
         </button>
@@ -36,14 +54,16 @@
         <p class="login-error" role="alert">{{ errorMessage }}</p>
       }
 
-      <div class="separator"><span>o</span></div>
+      @if (!desktopTransferComplete) {
+        <div class="separator"><span>o</span></div>
 
-      <ion-button fill="clear" expand="block" class="local-button" (click)="continueLocally()">
-        <ion-icon slot="start" name="cloud-offline-outline"></ion-icon>
-        Continuar solo en este dispositivo
-      </ion-button>
+        <ion-button fill="clear" expand="block" class="local-button" (click)="continueLocally()">
+          <ion-icon slot="start" name="cloud-offline-outline"></ion-icon>
+          Continuar solo en este dispositivo
+        </ion-button>
 
-      <p class="local-note">Puedes vincular una cuenta más adelante. Tu información local no se eliminará.</p>
+        <p class="local-note">Puedes vincular una cuenta más adelante. Tu información local no se eliminará.</p>
+      }
     </section>
   </main>
 </ion-content>

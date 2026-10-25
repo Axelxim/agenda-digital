@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, NgZone, OnInit, ViewChild, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { IonButton, IonContent, IonIcon, IonSpinner } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import { calendarOutline, cloudOfflineOutline, shieldCheckmarkOutline } from 'ionicons/icons';
@@ -37,18 +37,28 @@ declare global {
   styleUrl: './login.page.scss',
   imports: [IonButton, IonContent, IonIcon, IonSpinner],
 })
-export class LoginPage implements OnInit, AfterViewInit {
+export class LoginPage implements OnInit, AfterViewInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly zone = inject(NgZone);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly agendaSync = inject(AgendaSyncService);
+  private readonly route = inject(ActivatedRoute);
+  private desktopSessionCleanup?: () => void;
+  private desktopCloseTimeout?: ReturnType<typeof setTimeout>;
 
   @ViewChild('googleButton') googleButton!: ElementRef<HTMLDivElement>;
 
   loading = true;
   signingIn = false;
   errorMessage = '';
+  desktopTransferComplete = false;
+
+  readonly isDesktop = !!window.todoEnOrdenDesktop;
+
+  get isDesktopHandoff(): boolean {
+    return this.route.snapshot.queryParamMap.get('desktop') === '1';
+  }
 
   get rememberedAccount(): string | null {
     return this.auth.lastAccountEmail;
@@ -59,12 +69,29 @@ export class LoginPage implements OnInit, AfterViewInit {
   }
 
   async ngOnInit(): Promise<void> {
+    if (this.isDesktop) {
+      this.desktopSessionCleanup = window.todoEnOrdenDesktop?.onAuthSession((session) => {
+        this.zone.run(() => {
+          this.auth.adoptDesktopSession(session.user, session.token);
+          void this.navigateAfterLogin();
+        });
+      });
+    }
     if (this.auth.token && await this.auth.restoreSession()) {
+      if (this.isDesktopHandoff) {
+        await this.transferSessionToDesktop();
+        return;
+      }
       await this.navigateAfterLogin();
     }
   }
 
   async ngAfterViewInit(): Promise<void> {
+    if (this.isDesktop || (this.isDesktopHandoff && this.auth.isAuthenticated())) {
+      this.loading = false;
+      this.changeDetector.detectChanges();
+      return;
+    }
     try {
       await this.loadGoogleIdentity();
       this.loading = false;
@@ -78,6 +105,11 @@ export class LoginPage implements OnInit, AfterViewInit {
     }
   }
 
+  ngOnDestroy(): void {
+    this.desktopSessionCleanup?.();
+    if (this.desktopCloseTimeout) clearTimeout(this.desktopCloseTimeout);
+  }
+
   async continueLocally(): Promise<void> {
     this.auth.continueLocally();
     await this.router.navigateByUrl('/home', { replaceUrl: true });
@@ -86,6 +118,18 @@ export class LoginPage implements OnInit, AfterViewInit {
   useAnotherAccount(): void {
     this.auth.forgetLastAccount();
     window.location.reload();
+  }
+
+  async startDesktopGoogleLogin(): Promise<void> {
+    this.signingIn = true;
+    this.errorMessage = '';
+    try {
+      await window.todoEnOrdenDesktop?.startGoogleLogin();
+    } catch {
+      this.errorMessage = 'No fue posible abrir el navegador para iniciar sesión.';
+    } finally {
+      this.signingIn = false;
+    }
   }
 
   private renderGoogleButton(): void {
@@ -125,6 +169,10 @@ export class LoginPage implements OnInit, AfterViewInit {
     this.errorMessage = '';
     try {
       await this.auth.loginWithGoogle(response.credential);
+      if (this.isDesktopHandoff) {
+        await this.transferSessionToDesktop();
+        return;
+      }
       await this.navigateAfterLogin();
     } catch (error) {
       this.errorMessage = this.loginErrorMessage(error);
@@ -160,6 +208,33 @@ export class LoginPage implements OnInit, AfterViewInit {
   private async navigateAfterLogin(): Promise<void> {
     const destination = this.agendaSync.hasPreference() ? '/home' : '/configurar-sincronizacion';
     await this.router.navigateByUrl(destination, { replaceUrl: true });
+  }
+
+  private async transferSessionToDesktop(): Promise<void> {
+    const port = Number(this.route.snapshot.queryParamMap.get('port'));
+    const nonce = this.route.snapshot.queryParamMap.get('nonce') ?? '';
+    const user = this.auth.user();
+    const token = this.auth.token;
+    if (!Number.isInteger(port) || port < 1024 || port > 65535 || nonce.length < 32 || !user || !token) {
+      this.errorMessage = 'La solicitud de la aplicación de Windows no es válida.';
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/session?nonce=${encodeURIComponent(nonce)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify({ user, token }),
+      });
+      if (!response.ok) throw new Error('No se pudo entregar la sesión.');
+      this.desktopTransferComplete = true;
+      this.loading = false;
+      this.signingIn = false;
+      this.changeDetector.detectChanges();
+      this.desktopCloseTimeout = setTimeout(() => window.close(), 2500);
+    } catch {
+      this.errorMessage = 'No fue posible entregar la sesión a Todo en Orden para Windows.';
+    }
   }
 
   private loginErrorMessage(error: unknown): string {

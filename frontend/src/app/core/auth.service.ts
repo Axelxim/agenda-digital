@@ -65,6 +65,10 @@ export class AuthService {
     return response.data.user;
   }
 
+  adoptDesktopSession(user: AuthUser, token: string): void {
+    this.saveSession(user, token);
+  }
+
   async restoreSession(): Promise<boolean> {
     if (!this.token) {
       return false;

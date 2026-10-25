@@ -1,0 +1,60 @@
+{
+  "name": "todo-en-orden-desktop",
+  "version": "2.0.0",
+  "description": "Aplicación de escritorio de Todo en Orden para Windows",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names WEB,WINDOWS --prefix-colors blue,magenta \"npm:dev:web\" \"npm:dev:electron\"",
+    "dev:web": "vite --host localhost --port 5173",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env ELECTRON_RENDERER_URL=http://localhost:5173 node scripts/run-electron.cjs",
+    "start": "npm run dev",
+    "check": "tsc --noEmit && node --check electron/main.cjs && node --check electron/preload.cjs && node --check scripts/run-electron.cjs",
+    "build:web": "vite build",
+    "pack": "npm run build:web && electron-builder --dir --win",
+    "dist": "npm run build:web && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.todoenorden.desktop",
+    "productName": "Todo en Orden",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "renderer"
+      },
+      {
+        "from": "../frontend/src/assets/icon/favicon.png",
+        "to": "assets/icon.png"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Todo en Orden"
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "cross-env": "^10.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "wait-on": "^9.5.1"
+  }
+}

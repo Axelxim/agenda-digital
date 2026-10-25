@@ -95,6 +95,46 @@ header > p:last-child,
   display: none;
 }
 
+.desktop-google-button {
+  width: 100%;
+  margin: 0;
+  --border-radius: 8px;
+  --background: #ffffff;
+  --color: #202124;
+  --box-shadow: none;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.desktop-success {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, #16a36a 55%, var(--border));
+  border-radius: 12px;
+  color: var(--text);
+  background: color-mix(in srgb, #16a36a 12%, var(--surface));
+}
+
+.desktop-success ion-icon {
+  flex: 0 0 auto;
+  color: #16a36a;
+  font-size: 24px;
+}
+
+.desktop-success div {
+  display: grid;
+  gap: 3px;
+}
+
+.desktop-success span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .google-loading {
   min-height: 44px;
   display: flex;

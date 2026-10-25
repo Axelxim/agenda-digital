@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { afterEach, vi } from 'vitest';
 
 import { TaskService } from './task.service';
 
@@ -6,6 +7,8 @@ describe('TaskService', () => {
   let service: TaskService;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T09:00:00'));
     localStorage.clear();
     localStorage.setItem('tareas', JSON.stringify([
       {
@@ -25,6 +28,8 @@ describe('TaskService', () => {
     service = TestBed.inject(TaskService);
     service.load();
   });
+
+  afterEach(() => vi.useRealTimers());
 
   it('updates both times and duration when rescheduling a task', () => {
     const tasks = service.reschedule(99, '2026-10-26', '14:00', '14:20');

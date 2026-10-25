@@ -419,6 +419,7 @@ export class HomePage implements OnInit, OnDestroy {
   private notificationActionListener?: PluginListenerHandle;
   private calendarRefreshTimer?: ReturnType<typeof setTimeout>;
   private initialPermissionTimer?: ReturnType<typeof setTimeout>;
+  private desktopRefreshCleanup?: () => void;
   private readonly liveStateSubscriptions = new Subscription();
   private lastClockMinute = '';
   private lastStoredRefreshAt = 0;
@@ -504,6 +505,10 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.desktopRefreshCleanup = window.todoEnOrdenDesktop?.onRefreshAgenda(() => {
+      this.refreshStoredState();
+      void this.agendaSync.syncNow();
+    });
     this.connectLiveState();
     window.addEventListener('storage', this.storageChangeListener);
     window.addEventListener('focus', this.windowFocusListener);
@@ -589,6 +594,7 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.desktopRefreshCleanup?.();
     if (this.currentTimeTimer) {
       clearInterval(this.currentTimeTimer);
     }
