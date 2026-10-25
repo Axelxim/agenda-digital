@@ -1,6 +1,7 @@
 export type TaskPriority = 'baja' | 'media' | 'alta';
 export type TaskStatus = 'pendiente' | 'completada' | 'vencida' | 'ignorada';
 export type TaskRepeat = 'none' | 'daily' | 'weekly' | 'monthly';
+export type TaskSyncStatus = 'pending' | 'synced' | 'conflict';
 export type RecurrenceScope = 'one' | 'following' | 'all';
 export type TaskType = 'evento' | 'tarea';
 export type TaskLabel =
@@ -10,6 +11,12 @@ export type TaskLabel =
   | 'Salud'
   | 'Ocio';
 export type ReminderLeadMinutes = 10080 | 4320 | 2880 | 1440 | 720 | 180;
+
+export interface TaskSubtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
 
 export interface LabelReminderSettings {
   label: TaskLabel;
@@ -27,6 +34,8 @@ export interface CalculatedLabelReminder {
 
 export interface Task {
   id: number;
+  /** Identificador estable que se conservará entre dispositivos. */
+  uuid?: string;
   titulo: string;
   tipo: TaskType;
   fecha?: string;
@@ -48,6 +57,11 @@ export interface Task {
   recurrenceExceptions?: string[];
   /** Actividad que agrupa esta tarea dentro del mismo día. */
   parentId?: number;
+  subtasks?: TaskSubtask[];
+  createdAt?: string;
+  updatedAt?: string;
+  version?: number;
+  syncStatus?: TaskSyncStatus;
 }
 
 export interface TaskSection {

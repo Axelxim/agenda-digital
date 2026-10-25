@@ -1,7 +1,8 @@
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { App } from '@capacitor/app';
 import { PluginListenerHandle } from '@capacitor/core';
+import { ActionPerformed } from '@capacitor/local-notifications';
 import {
   IonButton,
   IonAlert,
@@ -16,17 +17,26 @@ import {
   IonHeader,
   IonIcon,
   IonInput,
+  IonMenu,
   IonModal,
+  IonRefresher,
+  IonRefresherContent,
+  IonSearchbar,
   IonSelect,
   IonSelectOption,
   IonTitle,
+  IonTextarea,
   IonToggle,
   IonToolbar,
+  MenuController,
+  RefresherCustomEvent,
 } from '@ionic/angular';
 import { FormsModule } from '@angular/forms';
 import { addIcons } from 'ionicons';
+import { Subscription } from 'rxjs';
 import {
   alertCircleOutline,
+  batteryChargingOutline,
   calendarOutline,
   checkboxOutline,
   chevronBackOutline,
@@ -38,15 +48,24 @@ import {
   giftOutline,
   homeOutline,
   menuOutline,
+  medicalOutline,
+  walletOutline,
+  cashOutline,
+  receiptOutline,
+  documentTextOutline,
   notificationsOutline,
+  pauseOutline,
       pricetagOutline,
       pencilOutline,
+      playOutline,
       repeatOutline,
   saveOutline,
+  searchOutline,
   settingsOutline,
   sunnyOutline,
   timeOutline,
   trashOutline,
+  stopCircleOutline,
   add,
 } from 'ionicons/icons';
 import {
@@ -60,6 +79,7 @@ import {
   TaskPriority,
   TaskRepeat,
   TaskSection,
+  TaskSubtask,
   TaskSummary,
   TaskType,
 } from '../core/task.model';
@@ -75,11 +95,65 @@ import {
   NotificationSyncStatus,
 } from '../core/notification-scheduler.service';
 import { TaskService } from '../core/task.service';
+import { MedicationDose, MedicationTreatment, WellnessSettings } from '../core/wellness.model';
+import { WellnessService } from '../core/wellness.service';
+import { QuickNote } from '../core/note.model';
+import { NoteService } from '../core/note.service';
+import { FixedExpense, FixedExpenseOccurrence, WalletState, WalletTransactionKind } from '../core/wallet.model';
+import { WalletService } from '../core/wallet.service';
 
 type ViewMode = 'hoy' | 'calendario' | 'pendientes' | 'mas';
 type CalendarView = 'dia' | 'semana' | 'mes';
 type PendingFilter = 'pendientes' | 'programadas' | 'vencidas' | 'completadas';
 type FormMode = 'create' | 'edit' | 'reschedule';
+type WellnessView = 'treatment' | 'medication';
+type MedicationHistoryStatus = 'taken' | 'late' | 'missed' | 'overdue' | 'pending';
+type MedicationHistoryFilter = 'all' | MedicationHistoryStatus;
+type WalletView = 'dashboard' | 'transaction' | 'fixed' | 'payment' | 'settings';
+
+interface TreatmentMedicationDraft {
+  key: string;
+  name: string;
+  dose: string;
+  instructions: string;
+  frequencyHours: number;
+  durationDays: number | null;
+  firstTime: string;
+  color: string;
+  strictTracking: boolean;
+  stockEnabled: boolean;
+  stockQuantity: number;
+  doseUnits: number;
+  stockUnit: string;
+  lowStockThreshold: number;
+}
+
+interface TreatmentGroup {
+  key: string;
+  name: string;
+  treatments: MedicationTreatment[];
+  status: MedicationTreatment['status'];
+  startDate: string;
+}
+
+interface MedicationHistoryEntry {
+  dose: MedicationDose;
+  treatment: MedicationTreatment;
+  status: MedicationHistoryStatus;
+}
+
+type GlobalSearchResultKind = 'task' | 'event' | 'birthday' | 'treatment' | 'medication' | 'note';
+
+interface GlobalSearchResult {
+  id: string;
+  kind: GlobalSearchResultKind;
+  title: string;
+  subtitle: string;
+  task?: Task;
+  treatment?: MedicationTreatment;
+  treatmentGroupKey?: string;
+  note?: QuickNote;
+}
 
 interface CalendarDay {
   label: number;
@@ -120,10 +194,15 @@ interface TimedEventLayout {
     IonHeader,
     IonIcon,
     IonInput,
+    IonMenu,
     IonModal,
+    IonRefresher,
+    IonRefresherContent,
+    IonSearchbar,
     IonSelect,
     IonSelectOption,
     IonTitle,
+    IonTextarea,
     IonToggle,
     IonToolbar,
   ],
@@ -133,12 +212,24 @@ export class HomePage implements OnInit, OnDestroy {
   private readonly labelReminderService = inject(LabelReminderService);
   private readonly notificationScheduler = inject(NotificationSchedulerService);
   private readonly deviceCalendarService = inject(DeviceCalendarService);
+  private readonly wellnessService = inject(WellnessService);
+  private readonly noteService = inject(NoteService);
+  private readonly walletService = inject(WalletService);
+  private readonly menuController = inject(MenuController);
+  private readonly changeDetector = inject(ChangeDetectorRef);
 
   @ViewChild(IonModal) modal?: IonModal;
   @ViewChild('agendaTimeline') agendaTimeline?: ElementRef<HTMLElement>;
   @ViewChild('presetModal') presetModal?: IonModal;
   @ViewChild('settingsModal') settingsModal?: IonModal;
   @ViewChild('deviceCalendarModal') deviceCalendarModal?: IonModal;
+  @ViewChild('batteryModal') batteryModal?: IonModal;
+  @ViewChild('wellnessModal') wellnessModal?: IonModal;
+  @ViewChild('treatmentsModal') treatmentsModal?: IonModal;
+  @ViewChild('globalSearchModal') globalSearchModal?: IonModal;
+  @ViewChild('notesModal') notesModal?: IonModal;
+  @ViewChild('walletModal') walletModal?: IonModal;
+  @ViewChild('todayFab') todayFab?: IonFab;
 
   titulo = 'Agenda';
   selectedView: ViewMode = 'hoy';
@@ -169,6 +260,8 @@ export class HomePage implements OnInit, OnDestroy {
   expandedTaskId: number | null = null;
   expandedReminderLabel: TaskLabel | null = null;
   notificationSyncStatus: NotificationSyncStatus | 'idle' | 'error' = 'idle';
+  batteryOptimizationStatus: 'checking' | 'protected' | 'restricted' | 'unavailable' = 'checking';
+  batteryDeviceInfo = { manufacturer: 'Android', family: 'android' };
   calendarEditError = '';
   deviceCalendarStatus: 'idle' | 'loading' | 'ready' | 'denied' | 'unavailable' | 'error' = 'idle';
   deviceCalendars: DeviceCalendar[] = [];
@@ -178,6 +271,74 @@ export class HomePage implements OnInit, OnDestroy {
     selectedCalendarIds: [],
     selectionConfigured: false,
   };
+  wellnessSettings: WellnessSettings = { enabled: false };
+  medicationTreatments: MedicationTreatment[] = [];
+  medicationDoses: MedicationDose[] = [];
+  wellnessView: WellnessView = 'treatment';
+  treatmentName = '';
+  treatmentStartDate = '';
+  treatmentMedicationDrafts: TreatmentMedicationDraft[] = [];
+  editingDraftKey: string | null = null;
+  editingMedicationId: string | null = null;
+  medicationName = '';
+  medicationDose = '';
+  medicationInstructions = '';
+  medicationStartDate = '';
+  medicationEndDate = '';
+  medicationContinuous = false;
+  medicationDays: number[] = [];
+  medicationTimes: string[] = [];
+  medicationColor = '#22c55e';
+  medicationStrictTracking = false;
+  medicationStockEnabled = false;
+  medicationStockQuantity = 30;
+  medicationDoseUnits = 1;
+  medicationStockUnit = 'tabletas';
+  medicationLowStockThreshold = 5;
+  medicationFrequencyHours = 8;
+  medicationDurationDays: number | null = 4;
+  medicationFirstTime = '08:00';
+  confirmingMedicationDeletion = false;
+  expandedTreatmentGroupKey: string | null = null;
+  confirmingTreatmentGroupDeleteKey: string | null = null;
+  restockingMedicationId: string | null = null;
+  restockAmount = 0;
+  selectedHistoryGroupKey: string | null = null;
+  medicationHistoryFilter: MedicationHistoryFilter = 'all';
+  globalSearchQuery = '';
+  quickNotes: QuickNote[] = [];
+  notesView: 'list' | 'editor' = 'list';
+  editingNoteId: string | null = null;
+  noteTitle = '';
+  noteContent = '';
+  walletState: WalletState = {
+    settings: { salaryAmount: 0, paySchedule: 'semi-monthly', firstPayDate: '', currency: 'MXN' },
+    fixedExpenses: [],
+    transactions: [],
+  };
+  walletView: WalletView = 'dashboard';
+  walletTransactionKind: WalletTransactionKind = 'expense';
+  walletDescription = '';
+  walletAmount: number | null = null;
+  walletCategory = 'Otros';
+  walletDate = '';
+  editingFixedExpenseId: string | null = null;
+  fixedExpenseName = '';
+  fixedExpenseAmount: number | null = null;
+  fixedExpenseCategory = 'Servicios';
+  fixedExpenseDueDay = 1;
+  fixedExpenseFrequencyMonths: 1 | 2 = 1;
+  fixedExpenseReminderTime = '09:00';
+  payingFixedOccurrence: FixedExpenseOccurrence | null = null;
+  fixedPaymentAmount: number | null = null;
+  fixedPaymentDate = '';
+  walletSalaryAmount: number | null = null;
+  walletPaySchedule: 'semi-monthly' | 'biweekly' = 'semi-monthly';
+  walletFirstPayDate = '';
+  returnToTreatmentManager = false;
+  readonly medicationFrequencyOptions = [4, 6, 8, 12, 24];
+  readonly medicationDurationOptions = [3, 4, 5, 7, 10, 14, 30];
+  readonly medicationStockUnits = ['tabletas', 'cápsulas', 'dosis', 'ml'];
 
   tareas: Task[] = [];
   secciones: TaskSection[] = [];
@@ -198,6 +359,9 @@ export class HomePage implements OnInit, OnDestroy {
   nuevaFecha = '';
   nuevaHora = '';
   nuevaHoraFin = '';
+  taskSubtasks: TaskSubtask[] = [];
+  newSubtaskTitle = '';
+  advancedModeEnabled = false;
   eventColor = '#2563eb';
   preestablecidos: EventPreset[] = [];
   presetNombre = '';
@@ -216,8 +380,33 @@ export class HomePage implements OnInit, OnDestroy {
   private currentTimeTimer?: ReturnType<typeof setInterval>;
   private appResumeListener?: PluginListenerHandle;
   private calendarChangeListener?: PluginListenerHandle;
+  private notificationActionListener?: PluginListenerHandle;
   private calendarRefreshTimer?: ReturnType<typeof setTimeout>;
+  private readonly liveStateSubscriptions = new Subscription();
+  private lastClockMinute = '';
+  private lastStoredRefreshAt = 0;
+  private readonly storageChangeListener = () => this.refreshStoredState();
+  private readonly windowFocusListener = () => this.refreshStoredState();
+  private readonly visibilityChangeListener = () => {
+    if (document.visibilityState === 'visible') this.refreshStoredState();
+  };
   private reminderSettingsReady = false;
+  private readonly fabPositionKey = 'home-fab-position';
+  private readonly advancedModeKey = 'agenda-advanced-mode';
+  private fabDrag?: {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+    startRect: DOMRect;
+    button: HTMLElement;
+  };
+  private suppressFabClick = false;
+  fabOffsetX = 0;
+  fabOffsetY = 0;
+  fabListSide: 'top' | 'bottom' = 'top';
+  fabDragging = false;
 
   readonly etiquetas = this.taskService.etiquetas;
   readonly reminderLeadOptions = this.labelReminderService.leadOptions;
@@ -238,6 +427,7 @@ export class HomePage implements OnInit, OnDestroy {
   constructor() {
     addIcons({
       alertCircleOutline,
+      batteryChargingOutline,
       calendarOutline,
       checkboxOutline,
       chevronBackOutline,
@@ -249,20 +439,35 @@ export class HomePage implements OnInit, OnDestroy {
       giftOutline,
       homeOutline,
       menuOutline,
+      medicalOutline,
+      walletOutline,
+      cashOutline,
+      receiptOutline,
+      documentTextOutline,
       notificationsOutline,
+      pauseOutline,
   pricetagOutline,
   pencilOutline,
+  playOutline,
   repeatOutline,
       saveOutline,
+      searchOutline,
       settingsOutline,
       sunnyOutline,
       timeOutline,
       trashOutline,
+      stopCircleOutline,
       add,
     });
   }
 
   ngOnInit(): void {
+    this.connectLiveState();
+    window.addEventListener('storage', this.storageChangeListener);
+    window.addEventListener('focus', this.windowFocusListener);
+    document.addEventListener('visibilitychange', this.visibilityChangeListener);
+    this.advancedModeEnabled = localStorage.getItem(this.advancedModeKey) === 'true';
+    this.loadFabPosition();
     this.selectedDate = this.taskService.toISODate(new Date());
     this.currentMonth = new Date(`${this.selectedDate}T00:00:00`);
     this.setTasks(this.taskService.load());
@@ -271,11 +476,45 @@ export class HomePage implements OnInit, OnDestroy {
     );
     this.reminderSettingsReady = true;
     this.syncNotifications();
+    void this.refreshBatteryOptimizationStatus();
     this.preestablecidos = this.taskService.loadEventPresets();
+    this.wellnessSettings = this.wellnessService.loadSettings();
+    this.medicationTreatments = this.wellnessService.loadTreatments();
+    this.quickNotes = this.noteService.load();
+    this.walletState = this.walletService.load();
+    void this.walletService.initializePersistence().then((state) => {
+      this.walletState = state;
+      this.syncNotifications();
+      this.refreshView();
+    });
+    void this.noteService.initializePersistence().then((notes) => {
+      this.quickNotes = notes;
+      this.refreshView();
+    });
+    void this.wellnessService.initializePersistence().then((treatments) => {
+      this.medicationTreatments = treatments;
+      this.medicationDoses = this.wellnessService.getDoses();
+      this.buildCalendar();
+      this.syncNotifications();
+      this.refreshView();
+    });
+    void this.taskService.initializePersistence().then(({ tasks, presets }) => {
+      this.preestablecidos = presets;
+      this.setTasks(tasks);
+    });
     this.deviceCalendarSettings = this.deviceCalendarService.loadSettings();
+    void this.notificationScheduler.listenForActions((action) =>
+      this.handleNotificationAction(action),
+    ).then((listener) => {
+      this.notificationActionListener = listener;
+    });
     void this.refreshDeviceCalendarEvents();
     if (this.deviceCalendarService.supported) {
-      void App.addListener('resume', () => this.refreshDeviceCalendarEvents()).then((listener) => {
+      void App.addListener('resume', () => {
+        this.refreshStoredState();
+        void this.refreshDeviceCalendarEvents();
+        void this.refreshBatteryOptimizationStatus();
+      }).then((listener) => {
         this.appResumeListener = listener;
       });
       void this.deviceCalendarService.observeChanges(() => {
@@ -285,9 +524,8 @@ export class HomePage implements OnInit, OnDestroy {
         this.calendarChangeListener = listener;
       });
     }
-    this.currentTimeTimer = setInterval(() => {
-      this.currentTime = new Date();
-    }, 60_000);
+    this.updateLiveClock();
+    this.currentTimeTimer = setInterval(() => this.updateLiveClock(), 1_000);
   }
 
   ngOnDestroy(): void {
@@ -296,7 +534,81 @@ export class HomePage implements OnInit, OnDestroy {
     }
     void this.appResumeListener?.remove();
     void this.calendarChangeListener?.remove();
+    void this.notificationActionListener?.remove();
+    this.liveStateSubscriptions.unsubscribe();
+    window.removeEventListener('storage', this.storageChangeListener);
+    window.removeEventListener('focus', this.windowFocusListener);
+    document.removeEventListener('visibilitychange', this.visibilityChangeListener);
     if (this.calendarRefreshTimer) clearTimeout(this.calendarRefreshTimer);
+  }
+
+  private connectLiveState(): void {
+    this.liveStateSubscriptions.add(
+      this.taskService.changes$.subscribe((tasks) => this.setTasks(tasks)),
+    );
+    this.liveStateSubscriptions.add(
+      this.walletService.changes$.subscribe((state) => {
+        this.walletState = state;
+        this.syncNotifications();
+        this.refreshView();
+      }),
+    );
+    this.liveStateSubscriptions.add(
+      this.wellnessService.changes$.subscribe(({ treatments, doses, settings }) => {
+        this.wellnessSettings = settings;
+        this.medicationTreatments = treatments;
+        this.medicationDoses = doses;
+        this.buildCalendar();
+        this.syncNotifications();
+        this.refreshView();
+      }),
+    );
+    this.liveStateSubscriptions.add(
+      this.noteService.changes$.subscribe((notes) => {
+        this.quickNotes = notes;
+        this.refreshView();
+      }),
+    );
+  }
+
+  private updateLiveClock(): void {
+    const previousDate = this.taskService.toISODate(this.currentTime);
+    this.currentTime = new Date();
+    this.refreshView();
+    const currentMinute = `${this.taskService.toISODate(this.currentTime)}T${String(this.currentTime.getHours()).padStart(2, '0')}:${String(this.currentTime.getMinutes()).padStart(2, '0')}`;
+    if (currentMinute === this.lastClockMinute) return;
+
+    this.lastClockMinute = currentMinute;
+    if (this.taskService.toISODate(this.currentTime) !== previousDate) {
+      this.medicationDoses = this.wellnessService.refreshDoses(this.currentTime);
+    }
+    this.refreshExpiredTasks();
+  }
+
+  private refreshStoredState(): void {
+    const now = Date.now();
+    if (now - this.lastStoredRefreshAt < 250) return;
+    this.lastStoredRefreshAt = now;
+    this.currentTime = new Date();
+    this.taskService.load();
+    this.preestablecidos = this.taskService.loadEventPresets();
+    this.labelReminderSettings = this.labelReminderService.load(
+      this.etiquetas.map((label) => label.nombre),
+    );
+    this.deviceCalendarSettings = this.deviceCalendarService.loadSettings();
+    this.wellnessSettings = this.wellnessService.loadSettings();
+    this.medicationTreatments = this.wellnessService.loadTreatments();
+    this.wellnessService.loadDoses();
+    this.medicationDoses = this.wellnessService.refreshDoses(this.currentTime);
+    this.quickNotes = this.noteService.load();
+    this.walletState = this.walletService.load();
+    this.buildCalendar();
+    this.syncNotifications();
+    this.refreshView();
+  }
+
+  private refreshView(): void {
+    this.changeDetector.markForCheck();
   }
 
   get visibleSections(): TaskSection[] {
@@ -362,7 +674,11 @@ export class HomePage implements OnInit, OnDestroy {
     const today = this.taskService.toISODate(this.currentTime);
     const now = this.currentTime.getHours() * 60 + this.currentTime.getMinutes();
     return this.calendarTasks.filter((tarea) => {
-      if (tarea.tipo !== 'evento' || tarea.estado === 'ignorada' || tarea.fecha !== today || !tarea.hora) {
+      if (
+        tarea.estado !== 'pendiente' ||
+        tarea.fecha !== today ||
+        !tarea.hora
+      ) {
         return false;
       }
       const [startHour, startMinute] = tarea.hora.split(':').map(Number);
@@ -379,7 +695,11 @@ export class HomePage implements OnInit, OnDestroy {
 
     return this.calendarTasks
       .filter((tarea) => {
-        if (tarea.tipo !== 'evento' || tarea.estado === 'ignorada' || tarea.fecha !== today || !tarea.hora) return false;
+        if (
+          tarea.estado !== 'pendiente' ||
+          tarea.fecha !== today ||
+          !tarea.hora
+        ) return false;
         return new Date(`${tarea.fecha}T${tarea.hora}:00`).getTime() > now;
       })
       .sort((a, b) => `${a.fecha}T${a.hora}`.localeCompare(`${b.fecha}T${b.hora}`));
@@ -395,8 +715,7 @@ export class HomePage implements OnInit, OnDestroy {
 
   get selectedDateTasks(): Task[] {
     return this.taskService
-      .getTasksForDate(this.selectedDate, this.calendarTasks)
-      .filter((tarea) => tarea.estado !== 'completada');
+      .getTasksForDate(this.selectedDate, this.calendarTasks);
   }
 
   get actividadesMadreDisponibles(): Task[] {
@@ -498,13 +817,118 @@ export class HomePage implements OnInit, OnDestroy {
     this.selectedView = view;
 
     if (view === 'hoy') {
-      this.setTasks(this.taskService.getAll());
+      this.currentTime = new Date();
+      this.medicationDoses = this.wellnessService.refreshDoses(this.currentTime);
+      this.refreshExpiredTasks();
     }
 
     if (view === 'calendario' && this.calendarView === 'dia') {
       void this.refreshDeviceCalendarEvents();
       setTimeout(() => this.scrollToCurrentHour());
     }
+  }
+
+  async refreshPage(event: RefresherCustomEvent): Promise<void> {
+    try {
+      this.currentTime = new Date();
+      const { presets } = await this.taskService.initializePersistence();
+      this.preestablecidos = presets;
+      this.labelReminderSettings = this.labelReminderService.load(
+        this.etiquetas.map((label) => label.nombre),
+      );
+      this.deviceCalendarSettings = this.deviceCalendarService.loadSettings();
+      this.wellnessSettings = this.wellnessService.loadSettings();
+      this.medicationTreatments = await this.wellnessService.initializePersistence();
+      this.medicationDoses = this.wellnessService.getDoses();
+      this.quickNotes = await this.noteService.initializePersistence();
+      this.setTasks(this.taskService.refreshExpired(this.currentTime));
+      await Promise.all([
+        this.refreshDeviceCalendarEvents(),
+        this.refreshBatteryOptimizationStatus(),
+      ]);
+    } finally {
+      await event.target.complete();
+    }
+  }
+
+  startFabDrag(event: PointerEvent): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const button = event.currentTarget as HTMLElement;
+    const fab = button.closest('ion-fab');
+    if (!fab) return;
+
+    this.fabDrag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startOffsetX: this.fabOffsetX,
+      startOffsetY: this.fabOffsetY,
+      startRect: fab.getBoundingClientRect(),
+      button,
+    };
+    this.fabDragging = true;
+    button.setPointerCapture(event.pointerId);
+  }
+
+  moveFab(event: PointerEvent): void {
+    const drag = this.fabDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const movementX = event.clientX - drag.startX;
+    const movementY = event.clientY - drag.startY;
+    if (!this.suppressFabClick && Math.hypot(movementX, movementY) < 6) return;
+
+    this.suppressFabClick = true;
+    event.preventDefault();
+    void this.todayFab?.close();
+
+    const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0;
+    const footerTop = document.querySelector('.bottom-nav')?.getBoundingClientRect().top ?? window.innerHeight;
+    const minLeft = 8;
+    const maxLeft = Math.max(minLeft, window.innerWidth - drag.startRect.width - 8);
+    const minTop = headerBottom + 8;
+    const maxTop = Math.max(minTop, footerTop - drag.startRect.height - 8);
+    const left = Math.min(maxLeft, Math.max(minLeft, drag.startRect.left + movementX));
+    const top = Math.min(maxTop, Math.max(minTop, drag.startRect.top + movementY));
+
+    this.fabOffsetX = drag.startOffsetX + left - drag.startRect.left;
+    this.fabOffsetY = drag.startOffsetY + top - drag.startRect.top;
+    this.fabListSide = top + drag.startRect.height / 2 < (headerBottom + footerTop) / 2
+      ? 'bottom'
+      : 'top';
+  }
+
+  endFabDrag(event: PointerEvent): void {
+    const drag = this.fabDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    if (drag.button.hasPointerCapture(event.pointerId)) {
+      drag.button.releasePointerCapture(event.pointerId);
+    }
+    this.fabDrag = undefined;
+
+    if (this.suppressFabClick) {
+      const currentLeft = drag.startRect.left + this.fabOffsetX - drag.startOffsetX;
+      const edgeLeft = 8;
+      const edgeRight = Math.max(edgeLeft, window.innerWidth - drag.startRect.width - 8);
+      const snappedLeft = currentLeft + drag.startRect.width / 2 < window.innerWidth / 2
+        ? edgeLeft
+        : edgeRight;
+      this.fabOffsetX += snappedLeft - currentLeft;
+      this.fabDragging = false;
+      this.saveFabPosition();
+      void this.todayFab?.close();
+      setTimeout(() => { this.suppressFabClick = false; }, 300);
+    } else {
+      this.fabDragging = false;
+    }
+  }
+
+  handleFabClick(event: MouseEvent): void {
+    if (!this.suppressFabClick) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void this.todayFab?.close();
   }
 
   selectDate(date: string): void {
@@ -750,6 +1174,7 @@ export class HomePage implements OnInit, OnDestroy {
           this.editingTaskId,
           this.nuevaFecha,
           this.nuevaHora,
+          this.nuevaHoraFin,
         ),
       );
       this.cerrarModal();
@@ -768,6 +1193,7 @@ export class HomePage implements OnInit, OnDestroy {
       favorita: this.favorita,
       repeticion: this.repeticion,
       parentId: this.formItemType === 'tarea' ? this.actividadMadreId : undefined,
+      subtasks: this.formItemType === 'tarea' ? this.taskSubtasks : undefined,
     };
 
     const externalEvent = this.editingExternalEvent;
@@ -836,6 +1262,40 @@ export class HomePage implements OnInit, OnDestroy {
   cambiarEstado(tarea: Task): void {
     if (this.expandedTaskId === tarea.id) this.expandedTaskId = null;
     this.setTasks(this.taskService.toggleCompleted(tarea.id));
+  }
+
+  agregarSubtarea(): void {
+    const title = this.newSubtaskTitle.trim();
+    if (!title) return;
+    this.taskSubtasks = [
+      ...this.taskSubtasks,
+      { id: this.createSubtaskId(), title, completed: false },
+    ];
+    this.newSubtaskTitle = '';
+  }
+
+  eliminarSubtarea(id: string): void {
+    this.taskSubtasks = this.taskSubtasks.filter((subtask) => subtask.id !== id);
+  }
+
+  toggleDraftSubtask(id: string): void {
+    this.taskSubtasks = this.taskSubtasks.map((subtask) => subtask.id === id
+      ? { ...subtask, completed: !subtask.completed }
+      : subtask);
+  }
+
+  toggleSavedSubtask(task: Task, subtaskId: string): void {
+    this.setTasks(this.taskService.toggleSubtask(task.id, subtaskId));
+  }
+
+  subtaskProgress(task: Task): { completed: number; total: number; percentage: number } {
+    const subtasks = task.subtasks ?? [];
+    const completed = subtasks.filter((subtask) => subtask.completed).length;
+    return {
+      completed,
+      total: subtasks.length,
+      percentage: subtasks.length ? Math.round((completed / subtasks.length) * 100) : 0,
+    };
   }
 
   toggleTaskActions(tarea: Task): void {
@@ -1148,6 +1608,1114 @@ export class HomePage implements OnInit, OnDestroy {
     this.settingsModal?.dismiss();
   }
 
+  setAdvancedModeEnabled(enabled: boolean): void {
+    this.advancedModeEnabled = enabled;
+    localStorage.setItem(this.advancedModeKey, String(enabled));
+  }
+
+  get globalSearchResults(): GlobalSearchResult[] {
+    const query = this.normalizeSearchText(this.globalSearchQuery.trim());
+    if (!query) return [];
+
+    const results: GlobalSearchResult[] = [];
+    const tasks = [...this.tareas, ...this.deviceCalendarTasks];
+    const seenTasks = new Set<string>();
+    for (const task of tasks) {
+      const external = this.deviceCalendarTasks.find((item) => item.id === task.id);
+      const sourceKey = `${external ? 'external' : 'local'}:${task.id}`;
+      if (seenTasks.has(sourceKey)) continue;
+      seenTasks.add(sourceKey);
+      const kind: GlobalSearchResultKind = external?.externalKind === 'birthday'
+        ? 'birthday'
+        : task.tipo === 'evento' ? 'event' : 'task';
+      const searchable = this.normalizeSearchText([
+        task.titulo,
+        ...(task.subtasks?.map((subtask) => subtask.title) ?? []),
+        task.etiqueta,
+        task.fecha,
+        task.hora,
+        this.globalSearchKindLabel(kind),
+      ].filter(Boolean).join(' '));
+      if (!searchable.includes(query)) continue;
+      const matchingSubtask = task.subtasks?.find((subtask) =>
+        this.normalizeSearchText(subtask.title).includes(query));
+      const details = [
+        matchingSubtask ? `Subtarea: ${matchingSubtask.title}` : undefined,
+        task.fecha ? this.taskService.formatDate(task.fecha) : 'Sin fecha',
+        task.hora,
+        task.etiqueta,
+      ].filter(Boolean).join(' · ');
+      results.push({
+        id: `${sourceKey}:${kind}`,
+        kind,
+        title: kind === 'birthday' && external ? this.birthdayName(external) : this.calendarTaskTitle(task),
+        subtitle: details,
+        task,
+      });
+    }
+
+    for (const group of this.treatmentGroups) {
+      const groupText = this.normalizeSearchText(`${group.name} tratamiento ${group.treatments.map((item) => item.name).join(' ')}`);
+      if (groupText.includes(query)) {
+        results.push({
+          id: `treatment:${group.key}`,
+          kind: 'treatment',
+          title: group.name,
+          subtitle: `${group.treatments.length} ${group.treatments.length === 1 ? 'medicamento' : 'medicamentos'} · Desde ${this.formatTreatmentDate(group.startDate)}`,
+          treatmentGroupKey: group.key,
+        });
+      }
+      for (const treatment of group.treatments) {
+        const medicationText = this.normalizeSearchText(`${treatment.name} ${treatment.dose} ${treatment.instructions ?? ''} ${group.name}`);
+        if (!medicationText.includes(query)) continue;
+        results.push({
+          id: `medication:${treatment.id}`,
+          kind: 'medication',
+          title: treatment.name,
+          subtitle: `${treatment.dose} · ${group.name}`,
+          treatment,
+          treatmentGroupKey: group.key,
+        });
+      }
+    }
+
+    for (const note of this.quickNotes) {
+      const searchable = this.normalizeSearchText(`${note.title} ${note.content} nota`);
+      if (!searchable.includes(query)) continue;
+      results.push({
+        id: `note:${note.id}`,
+        kind: 'note',
+        title: this.noteDisplayTitle(note),
+        subtitle: note.content || 'Nota sin contenido',
+        note,
+      });
+    }
+
+    return results.slice(0, 60);
+  }
+
+  async abrirBuscadorGlobal(): Promise<void> {
+    this.globalSearchQuery = '';
+    this.medicationTreatments = this.wellnessService.loadTreatments();
+    this.quickNotes = this.noteService.load();
+    await this.globalSearchModal?.present();
+  }
+
+  cerrarBuscadorGlobal(): void {
+    this.globalSearchQuery = '';
+    this.globalSearchModal?.dismiss();
+  }
+
+  globalSearchKindLabel(kind: GlobalSearchResultKind): string {
+    if (kind === 'task') return 'Tarea';
+    if (kind === 'event') return 'Evento';
+    if (kind === 'birthday') return 'Cumpleaños';
+    if (kind === 'treatment') return 'Tratamiento';
+    if (kind === 'note') return 'Nota';
+    return 'Medicamento';
+  }
+
+  globalSearchIcon(kind: GlobalSearchResultKind): string {
+    if (kind === 'task') return 'checkbox-outline';
+    if (kind === 'birthday') return 'gift-outline';
+    if (kind === 'treatment' || kind === 'medication') return 'medical-outline';
+    if (kind === 'note') return 'document-text-outline';
+    return 'calendar-outline';
+  }
+
+  async abrirResultadoGlobal(result: GlobalSearchResult): Promise<void> {
+    await this.globalSearchModal?.dismiss();
+    this.globalSearchQuery = '';
+    if (result.note) {
+      await this.abrirNotas(result.note);
+      return;
+    }
+    if (result.treatmentGroupKey) {
+      await this.abrirTratamientos();
+      this.expandedTreatmentGroupKey = result.treatmentGroupKey;
+      return;
+    }
+
+    const task = result.task;
+    if (!task) return;
+    if (task.fecha) {
+      this.selectedView = 'calendario';
+      this.calendarView = 'dia';
+      this.selectMonthDate(task.fecha);
+      setTimeout(() => this.scrollToCurrentHour());
+    }
+    const external = this.deviceCalendarTasks.some((item) => item.id === task.id);
+    if (external || task.tipo === 'evento') this.openCalendarItem(task);
+    else this.editarTarea(task);
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-MX');
+  }
+
+  async abrirNotas(note?: QuickNote): Promise<void> {
+    this.quickNotes = this.noteService.load();
+    if (note) this.editarNota(this.quickNotes.find((item) => item.id === note.id) ?? note);
+    else this.notesView = 'list';
+    await this.notesModal?.present();
+  }
+
+  cerrarNotas(): void {
+    this.resetNoteEditor();
+    this.notesModal?.dismiss();
+  }
+
+  nuevaNota(): void {
+    this.editingNoteId = null;
+    this.noteTitle = '';
+    this.noteContent = '';
+    this.notesView = 'editor';
+  }
+
+  editarNota(note: QuickNote): void {
+    this.editingNoteId = note.id;
+    this.noteTitle = note.title;
+    this.noteContent = note.content;
+    this.notesView = 'editor';
+  }
+
+  volverANotas(): void {
+    this.resetNoteEditor();
+  }
+
+  guardarNota(): void {
+    if (!this.noteTitle.trim() && !this.noteContent.trim()) return;
+    this.quickNotes = this.noteService.save(
+      { title: this.noteTitle, content: this.noteContent },
+      this.editingNoteId ?? undefined,
+    );
+    this.resetNoteEditor();
+  }
+
+  eliminarNota(): void {
+    if (!this.editingNoteId) return;
+    this.quickNotes = this.noteService.delete(this.editingNoteId);
+    this.resetNoteEditor();
+  }
+
+  async convertirNotaEnTarea(note?: QuickNote): Promise<void> {
+    const title = note ? this.noteConversionTitle(note) : this.prepareNoteConversion();
+    if (!title) return;
+    await this.notesModal?.dismiss();
+    this.resetNoteEditor();
+    this.nuevaTarea();
+    this.nuevoTitulo = title;
+  }
+
+  async convertirNotaEnEvento(note?: QuickNote): Promise<void> {
+    const title = note ? this.noteConversionTitle(note) : this.prepareNoteConversion();
+    if (!title) return;
+    await this.notesModal?.dismiss();
+    this.resetNoteEditor();
+    this.nuevoEvento();
+    this.nuevoTitulo = title;
+  }
+
+  private prepareNoteConversion(): string {
+    const source = this.noteTitle.trim() || this.noteContent.trim();
+    if (!source) return '';
+    this.quickNotes = this.noteService.save(
+      { title: this.noteTitle, content: this.noteContent },
+      this.editingNoteId ?? undefined,
+    );
+    return this.noteConversionTitle({ title: this.noteTitle, content: this.noteContent });
+  }
+
+  private noteConversionTitle(note: Pick<QuickNote, 'title' | 'content'>): string {
+    const source = note.title.trim() || note.content.trim();
+    return source.split(/\r?\n/)[0].trim().slice(0, 120);
+  }
+
+  noteDisplayTitle(note: QuickNote): string {
+    return note.title || note.content.split(/\r?\n/)[0].trim().slice(0, 70) || 'Nota';
+  }
+
+  noteUpdatedLabel(note: QuickNote): string {
+    return new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' })
+      .format(new Date(note.updatedAt));
+  }
+
+  get walletSummary() {
+    return this.walletService.summary(this.currentTime);
+  }
+
+  get walletCategories(): string[] {
+    return this.walletService.categories;
+  }
+
+  get walletModalTitle(): string {
+    if (this.walletView === 'dashboard') return 'Billetera';
+    if (this.walletView === 'transaction') return this.walletTransactionKind === 'expense' ? 'Registrar gasto' : 'Registrar ingreso';
+    if (this.walletView === 'fixed') return this.editingFixedExpenseId ? 'Editar gasto fijo' : 'Nuevo gasto fijo';
+    if (this.walletView === 'payment') return 'Registrar pago';
+    return 'Sueldo quincenal';
+  }
+
+  get homeFixedExpenses(): FixedExpenseOccurrence[] {
+    const today = this.taskService.toISODate(this.currentTime);
+    const tomorrow = this.taskService.toISODate(new Date(
+      this.currentTime.getFullYear(),
+      this.currentTime.getMonth(),
+      this.currentTime.getDate() + 1,
+    ));
+    return this.walletService.occurrences(this.currentTime, 0, 1)
+      .filter((item) => !item.paid && (item.dueDate === today || item.dueDate === tomorrow));
+  }
+
+  get walletPendingExpenses(): FixedExpenseOccurrence[] {
+    const today = this.taskService.toISODate(this.currentTime);
+    return this.walletService.occurrences(this.currentTime, 2, 2)
+      .filter((item) => !item.paid && item.dueDate >= today)
+      .slice(0, 12);
+  }
+
+  get walletOverdueExpenses(): FixedExpenseOccurrence[] {
+    const today = this.taskService.toISODate(this.currentTime);
+    return this.walletService.occurrences(this.currentTime, 3, 0)
+      .filter((item) => !item.paid && item.dueDate < today)
+      .sort((left, right) => right.dueDate.localeCompare(left.dueDate));
+  }
+
+  get walletRecentTransactions() {
+    return [...this.walletState.transactions]
+      .sort((left, right) => right.date.localeCompare(left.date) || right.createdAt.localeCompare(left.createdAt))
+      .slice(0, 30);
+  }
+
+  async abrirBilletera(): Promise<void> {
+    this.walletState = this.walletService.load();
+    this.walletView = 'dashboard';
+    await this.walletModal?.present();
+  }
+
+  cerrarBilletera(): void {
+    this.walletView = 'dashboard';
+    this.walletModal?.dismiss();
+  }
+
+  nuevaTransaccionBilletera(kind: WalletTransactionKind = 'expense'): void {
+    this.walletTransactionKind = kind;
+    this.walletDescription = '';
+    this.walletAmount = null;
+    this.walletCategory = kind === 'income' ? 'Otros' : 'Alimentos';
+    this.walletDate = this.taskService.toISODate(new Date());
+    this.walletView = 'transaction';
+  }
+
+  async nuevoGastoDesdeFab(): Promise<void> {
+    this.walletState = this.walletService.load();
+    this.nuevaTransaccionBilletera('expense');
+    await this.walletModal?.present();
+  }
+
+  guardarTransaccionBilletera(): void {
+    if (!this.walletDescription.trim() || !this.walletAmount || this.walletAmount <= 0 || !this.walletDate) return;
+    this.walletState = this.walletService.addTransaction({
+      kind: this.walletTransactionKind,
+      description: this.walletDescription,
+      amount: this.walletAmount,
+      category: this.walletCategory,
+      date: this.walletDate,
+    });
+    this.walletView = 'dashboard';
+  }
+
+  nuevoGastoFijo(expense?: FixedExpense): void {
+    this.editingFixedExpenseId = expense?.id ?? null;
+    this.fixedExpenseName = expense?.name ?? '';
+    this.fixedExpenseAmount = expense?.amount ?? null;
+    this.fixedExpenseCategory = expense?.category ?? 'Servicios';
+    this.fixedExpenseDueDay = expense?.dueDay ?? 1;
+    this.fixedExpenseFrequencyMonths = expense?.frequencyMonths ?? 1;
+    this.fixedExpenseReminderTime = expense?.reminderTime ?? '09:00';
+    this.walletView = 'fixed';
+  }
+
+  guardarGastoFijo(): void {
+    if (!this.fixedExpenseName.trim() || !this.fixedExpenseAmount || this.fixedExpenseAmount <= 0) return;
+    this.walletState = this.walletService.saveFixedExpense({
+      name: this.fixedExpenseName,
+      amount: this.fixedExpenseAmount,
+      category: this.fixedExpenseCategory,
+      dueDay: this.fixedExpenseDueDay,
+      frequencyMonths: this.fixedExpenseFrequencyMonths,
+      reminderTime: this.fixedExpenseReminderTime,
+      active: true,
+    }, this.editingFixedExpenseId ?? undefined);
+    this.walletView = 'dashboard';
+  }
+
+  eliminarGastoFijo(id: string): void {
+    this.walletState = this.walletService.deleteFixedExpense(id);
+    this.walletView = 'dashboard';
+  }
+
+  editarSueldo(): void {
+    this.walletSalaryAmount = this.walletState.settings.salaryAmount || null;
+    this.walletPaySchedule = this.walletState.settings.paySchedule;
+    this.walletFirstPayDate = this.walletState.settings.firstPayDate || this.taskService.toISODate(new Date());
+    this.walletView = 'settings';
+  }
+
+  guardarConfiguracionBilletera(): void {
+    this.walletState = this.walletService.saveSettings({
+      salaryAmount: Math.max(0, Number(this.walletSalaryAmount) || 0),
+      paySchedule: this.walletPaySchedule,
+      firstPayDate: this.walletFirstPayDate || this.taskService.toISODate(new Date()),
+      currency: 'MXN',
+    });
+    this.walletView = 'dashboard';
+  }
+
+  pagarGastoFijo(occurrence: FixedExpenseOccurrence): void {
+    this.payingFixedOccurrence = occurrence;
+    this.fixedPaymentAmount = occurrence.expense.amount;
+    this.fixedPaymentDate = this.taskService.toISODate(this.currentTime);
+    this.walletView = 'payment';
+  }
+
+  guardarPagoGastoFijo(): void {
+    if (!this.payingFixedOccurrence || !this.fixedPaymentAmount || this.fixedPaymentAmount <= 0 || !this.fixedPaymentDate) return;
+    this.walletState = this.walletService.markFixedPaid(
+      this.payingFixedOccurrence,
+      this.fixedPaymentDate,
+      this.fixedPaymentAmount,
+    );
+    this.payingFixedOccurrence = null;
+    this.walletView = 'dashboard';
+  }
+
+  eliminarMovimientoBilletera(id: string): void {
+    this.walletState = this.walletService.deleteTransaction(id);
+  }
+
+  walletMoney(value: number): string {
+    return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
+  }
+
+  walletDueLabel(occurrence: FixedExpenseOccurrence): string {
+    const today = this.taskService.toISODate(this.currentTime);
+    const tomorrow = this.taskService.toISODate(new Date(
+      this.currentTime.getFullYear(), this.currentTime.getMonth(), this.currentTime.getDate() + 1,
+    ));
+    if (occurrence.dueDate === today) return 'Vence hoy';
+    if (occurrence.dueDate === tomorrow) return 'Vence mañana';
+    if (occurrence.dueDate < today) return `Venció ${this.taskService.formatDate(occurrence.dueDate)}`;
+    return `Vence ${this.taskService.formatDate(occurrence.dueDate)}`;
+  }
+
+  private resetNoteEditor(): void {
+    this.notesView = 'list';
+    this.editingNoteId = null;
+    this.noteTitle = '';
+    this.noteContent = '';
+  }
+
+  async abrirPanelConfiguracion(): Promise<void> {
+    await this.refreshBatteryOptimizationStatus();
+    await this.menuController.open('settings-menu');
+  }
+
+  cerrarPanelConfiguracion(): void {
+    void this.menuController.close('settings-menu');
+  }
+
+  async abrirAlarmasDesdePanel(): Promise<void> {
+    await this.menuController.close('settings-menu');
+    await this.abrirConfiguracionBateria();
+  }
+
+  async abrirCalendariosDesdePanel(): Promise<void> {
+    await this.menuController.close('settings-menu');
+    await this.abrirCalendariosDispositivo();
+  }
+
+  setWellnessEnabled(enabled: boolean): void {
+    this.wellnessSettings = this.wellnessService.saveSettings({ enabled });
+    if (!enabled) this.cerrarBienestar();
+  }
+
+  async abrirBienestar(): Promise<void> {
+    if (!this.wellnessSettings.enabled) return;
+    this.medicationTreatments = this.wellnessService.loadTreatments();
+    this.startNewTreatment();
+    await this.wellnessModal?.present();
+  }
+
+  async abrirTratamientos(): Promise<void> {
+    if (!this.wellnessSettings.enabled) return;
+    this.medicationTreatments = this.wellnessService.loadTreatments();
+    this.medicationDoses = this.wellnessService.refreshDoses(this.currentTime);
+    this.confirmingTreatmentGroupDeleteKey = null;
+    this.selectedHistoryGroupKey = null;
+    this.medicationHistoryFilter = 'all';
+    await this.treatmentsModal?.present();
+  }
+
+  cerrarTratamientos(): void {
+    this.expandedTreatmentGroupKey = null;
+    this.confirmingTreatmentGroupDeleteKey = null;
+    this.selectedHistoryGroupKey = null;
+    this.medicationHistoryFilter = 'all';
+    this.treatmentsModal?.dismiss();
+  }
+
+  async nuevoMedicamentoDesdeFab(): Promise<void> {
+    if (!this.wellnessSettings.enabled) return;
+    this.medicationTreatments = this.wellnessService.loadTreatments();
+    this.startNewTreatment();
+    await this.wellnessModal?.present();
+  }
+
+  cerrarBienestar(): void {
+    this.resetWellnessFlow();
+    this.wellnessModal?.dismiss();
+  }
+
+  nuevoTratamiento(): void {
+    this.startNewTreatment();
+  }
+
+  private startNewTreatment(): void {
+    this.returnToTreatmentManager = false;
+    this.resetMedicationForm();
+    this.treatmentName = '';
+    this.treatmentStartDate = this.taskService.toISODate(new Date());
+    this.treatmentMedicationDrafts = [];
+    this.wellnessView = 'treatment';
+  }
+
+  agregarMedicamentoAlTratamiento(): void {
+    this.resetMedicationForm();
+    this.editingDraftKey = null;
+    this.wellnessView = 'medication';
+  }
+
+  editarMedicamentoDelTratamiento(draft: TreatmentMedicationDraft): void {
+    this.editingDraftKey = draft.key;
+    this.editingMedicationId = null;
+    this.medicationName = draft.name;
+    this.medicationDose = draft.dose;
+    this.medicationInstructions = draft.instructions;
+    this.medicationFrequencyHours = draft.frequencyHours;
+    this.medicationDurationDays = draft.durationDays;
+    this.medicationFirstTime = draft.firstTime;
+    this.medicationColor = draft.color;
+    this.medicationStrictTracking = draft.strictTracking;
+    this.medicationStockEnabled = draft.stockEnabled;
+    this.medicationStockQuantity = draft.stockQuantity;
+    this.medicationDoseUnits = draft.doseUnits;
+    this.medicationStockUnit = draft.stockUnit;
+    this.medicationLowStockThreshold = draft.lowStockThreshold;
+    this.wellnessView = 'medication';
+  }
+
+  volverDesdeBienestar(): void {
+    if (this.wellnessView === 'medication' && !this.editingMedicationId) {
+      this.resetMedicationForm();
+      this.wellnessView = 'treatment';
+      return;
+    }
+    if (this.wellnessView === 'medication') {
+      if (this.returnToTreatmentManager) {
+        this.volverAlAdministradorDeTratamientos();
+        return;
+      }
+      this.resetMedicationForm();
+      this.wellnessView = 'treatment';
+      return;
+    }
+    if (this.wellnessView === 'treatment') {
+      this.cerrarBienestar();
+    }
+  }
+
+  editarTratamiento(treatment: MedicationTreatment): void {
+    this.editingMedicationId = treatment.id;
+    this.treatmentName = treatment.treatmentName ?? '';
+    this.medicationName = treatment.name;
+    this.medicationDose = treatment.dose;
+    this.medicationInstructions = treatment.instructions ?? '';
+    this.medicationStartDate = treatment.startDate;
+    this.medicationEndDate = treatment.endDate ?? '';
+    this.medicationContinuous = treatment.continuous;
+    this.medicationDays = [...treatment.schedule.days];
+    this.medicationTimes = [...treatment.schedule.times];
+    this.medicationColor = treatment.color;
+    this.medicationStrictTracking = treatment.strictTracking;
+    this.medicationStockEnabled = treatment.stockEnabled;
+    this.medicationStockQuantity = treatment.stockQuantity;
+    this.medicationDoseUnits = treatment.doseUnits;
+    this.medicationStockUnit = treatment.stockUnit;
+    this.medicationLowStockThreshold = treatment.lowStockThreshold;
+    this.medicationFrequencyHours = this.inferMedicationFrequency(treatment.schedule.times);
+    this.medicationDurationDays = treatment.continuous
+      ? null
+      : this.daysBetween(treatment.startDate, treatment.endDate ?? treatment.startDate) + 1;
+    this.medicationFirstTime = treatment.schedule.times[0] ?? '08:00';
+    this.confirmingMedicationDeletion = false;
+    this.wellnessView = 'medication';
+  }
+
+  async editarMedicamentoGuardado(treatment: MedicationTreatment): Promise<void> {
+    this.returnToTreatmentManager = true;
+    await this.treatmentsModal?.dismiss();
+    this.editarTratamiento(treatment);
+    await this.wellnessModal?.present();
+  }
+
+  get calculatedMedicationTimes(): string[] {
+    const [hours, minutes] = this.medicationFirstTime.split(':').map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || this.medicationFrequencyHours <= 0) return [];
+    const firstMinutes = hours * 60 + minutes;
+    const times: string[] = [];
+    for (let offset = 0; offset < 24 * 60; offset += this.medicationFrequencyHours * 60) {
+      const value = (firstMinutes + offset) % (24 * 60);
+      const time = `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+      if (!times.includes(time)) times.push(time);
+    }
+    return times;
+  }
+
+  get calculatedDoseCount(): number | null {
+    return this.medicationDurationDays === null
+      ? null
+      : this.calculatedMedicationTimes.length * this.medicationDurationDays;
+  }
+
+  get medicationFormValid(): boolean {
+    const stockQuantity = Number(this.medicationStockQuantity);
+    const doseUnits = Number(this.medicationDoseUnits);
+    const lowStockThreshold = Number(this.medicationLowStockThreshold);
+
+    return !!this.medicationName.trim() &&
+      !!this.medicationDose.trim() &&
+      this.medicationFrequencyHours > 0 &&
+      (this.medicationDurationDays === null || this.medicationDurationDays > 0) &&
+      /^([01]\d|2[0-3]):[0-5]\d$/.test(this.medicationFirstTime) &&
+      this.calculatedMedicationTimes.length > 0 &&
+      (!this.medicationStockEnabled || (
+        Number.isFinite(stockQuantity) && stockQuantity >= 0 &&
+        Number.isFinite(doseUnits) && doseUnits > 0 &&
+        Number.isFinite(lowStockThreshold) && lowStockThreshold >= 0 &&
+        !!this.medicationStockUnit
+      ));
+  }
+
+  guardarMedicamento(): void {
+    if (!this.medicationFormValid) return;
+    if (this.editingMedicationId) {
+      const reopenManager = this.returnToTreatmentManager;
+      const startDate = this.medicationStartDate || this.taskService.toISODate(new Date());
+      this.medicationTreatments = this.wellnessService.saveTreatment(
+        this.buildTreatmentDraft(startDate),
+        this.editingMedicationId,
+      );
+      this.medicationDoses = this.wellnessService.getDoses();
+      this.buildCalendar();
+      this.syncNotifications();
+      if (reopenManager) {
+        this.volverAlAdministradorDeTratamientos();
+        return;
+      }
+      this.resetMedicationForm();
+      this.wellnessView = 'treatment';
+      return;
+    }
+
+    const draft: TreatmentMedicationDraft = {
+      key: this.editingDraftKey ?? this.createMedicationDraftKey(),
+      name: this.medicationName.trim(),
+      dose: this.medicationDose.trim(),
+      instructions: this.medicationInstructions.trim(),
+      frequencyHours: this.medicationFrequencyHours,
+      durationDays: this.medicationDurationDays,
+      firstTime: this.medicationFirstTime,
+      color: this.medicationColor,
+      strictTracking: this.medicationStrictTracking,
+      stockEnabled: this.medicationStockEnabled,
+      stockQuantity: Number(this.medicationStockQuantity),
+      doseUnits: Number(this.medicationDoseUnits),
+      stockUnit: this.medicationStockUnit,
+      lowStockThreshold: Number(this.medicationLowStockThreshold),
+    };
+    this.treatmentMedicationDrafts = this.editingDraftKey
+      ? this.treatmentMedicationDrafts.map((item) => item.key === this.editingDraftKey ? draft : item)
+      : [...this.treatmentMedicationDrafts, draft];
+    this.resetMedicationForm();
+    this.wellnessView = 'treatment';
+  }
+
+  guardarNuevoTratamiento(): void {
+    if (!this.treatmentName.trim() || !this.treatmentStartDate || this.treatmentMedicationDrafts.length === 0) return;
+    for (const medication of this.treatmentMedicationDrafts) {
+      this.medicationName = medication.name;
+      this.medicationDose = medication.dose;
+      this.medicationInstructions = medication.instructions;
+      this.medicationFrequencyHours = medication.frequencyHours;
+      this.medicationDurationDays = medication.durationDays;
+      this.medicationFirstTime = medication.firstTime;
+      this.medicationColor = medication.color;
+      this.medicationStrictTracking = medication.strictTracking;
+      this.medicationStockEnabled = medication.stockEnabled;
+      this.medicationStockQuantity = medication.stockQuantity;
+      this.medicationDoseUnits = medication.doseUnits;
+      this.medicationStockUnit = medication.stockUnit;
+      this.medicationLowStockThreshold = medication.lowStockThreshold;
+      this.medicationTreatments = this.wellnessService.saveTreatment(
+        this.buildTreatmentDraft(this.treatmentStartDate),
+      );
+    }
+    this.medicationDoses = this.wellnessService.getDoses();
+    this.buildCalendar();
+    this.syncNotifications(true);
+    this.cerrarBienestar();
+  }
+
+  medicationDraftSummary(draft: TreatmentMedicationDraft): string {
+    const duration = draft.durationDays === null ? 'Indefinido' : `${draft.durationDays} días`;
+    return `${draft.dose} · ${this.medicationFrequencyLabel(draft.frequencyHours)} · ${duration}`;
+  }
+
+  medicationFrequencyLabel(hours: number): string {
+    return hours === 24 ? 'Una vez al día' : `Cada ${hours} horas`;
+  }
+
+  get treatmentGroups(): TreatmentGroup[] {
+    const groups = new Map<string, MedicationTreatment[]>();
+    for (const treatment of this.medicationTreatments) {
+      const reference = treatment.treatmentName?.trim();
+      const key = reference ? `name:${reference.toLocaleLowerCase('es-MX')}` : `legacy:${treatment.id}`;
+      groups.set(key, [...(groups.get(key) ?? []), treatment]);
+    }
+    return [...groups.entries()]
+      .map(([key, treatments]) => ({
+        key,
+        name: treatments[0].treatmentName?.trim() || treatments[0].name,
+        treatments,
+        status: treatments.some((item) => item.status === 'active')
+          ? 'active' as const
+          : treatments.some((item) => item.status === 'paused') ? 'paused' as const : 'finished' as const,
+        startDate: [...treatments].sort((a, b) => a.startDate.localeCompare(b.startDate))[0].startDate,
+      }))
+      .sort((a, b) => b.startDate.localeCompare(a.startDate));
+  }
+
+  get selectedHistoryGroup(): TreatmentGroup | undefined {
+    return this.treatmentGroups.find((group) => group.key === this.selectedHistoryGroupKey);
+  }
+
+  get medicationHistoryEntries(): MedicationHistoryEntry[] {
+    const group = this.selectedHistoryGroup;
+    if (!group) return [];
+    const ids = new Set(group.treatments.map((item) => item.id));
+    const today = this.taskService.toISODate(this.currentTime);
+    const cutoff = this.addCalendarDays(today, -30);
+    return this.medicationDoses
+      .filter((dose) => {
+        const date = dose.scheduledAt.slice(0, 10);
+        return ids.has(dose.treatmentId) && date >= cutoff && date <= today;
+      })
+      .map((dose) => ({
+        dose,
+        treatment: group.treatments.find((item) => item.id === dose.treatmentId)!,
+        status: this.medicationHistoryStatus(dose),
+      }))
+      .filter((entry) => {
+        if (this.medicationHistoryFilter === 'all') return true;
+        if (this.medicationHistoryFilter === 'taken') {
+          return entry.status === 'taken' || entry.status === 'late';
+        }
+        return entry.status === this.medicationHistoryFilter;
+      })
+      .sort((a, b) => b.dose.scheduledAt.localeCompare(a.dose.scheduledAt));
+  }
+
+  abrirHistorialTratamiento(group: TreatmentGroup, filter: MedicationHistoryFilter = 'all'): void {
+    this.selectedHistoryGroupKey = group.key;
+    this.medicationHistoryFilter = filter;
+  }
+
+  cerrarHistorialTratamiento(): void {
+    this.selectedHistoryGroupKey = null;
+    this.medicationHistoryFilter = 'all';
+  }
+
+  medicationHistoryStatus(dose: MedicationDose): MedicationHistoryStatus {
+    if (dose.status === 'taken') {
+      const scheduledAt = new Date(dose.scheduledAt).getTime();
+      const recordedAt = dose.recordedAt ? new Date(dose.recordedAt).getTime() : scheduledAt;
+      return recordedAt > scheduledAt + 60_000 ? 'late' : 'taken';
+    }
+    if (dose.status === 'missed' || dose.status === 'skipped') return 'missed';
+    const date = dose.scheduledAt.slice(0, 10);
+    const today = this.taskService.toISODate(this.currentTime);
+    if (date < today) return 'missed';
+    return this.isMedicationDoseOverdue(dose) ? 'overdue' : 'pending';
+  }
+
+  medicationHistoryStatusLabel(status: MedicationHistoryStatus): string {
+    if (status === 'taken') return 'Sí';
+    if (status === 'late') return 'Tarde';
+    if (status === 'missed') return 'No';
+    if (status === 'overdue') return 'Atrasada';
+    return 'Pendiente';
+  }
+
+  formatMedicationHistoryDate(scheduledAt: string): string {
+    return new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })
+      .format(new Date(`${scheduledAt.slice(0, 10)}T12:00:00`));
+  }
+
+  medicationHistoryRecordedTime(entry: MedicationHistoryEntry): string {
+    if (!entry.dose.recordedAt || (entry.status !== 'taken' && entry.status !== 'late')) return '';
+    return new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' })
+      .format(new Date(entry.dose.recordedAt));
+  }
+
+  toggleTreatmentGroup(group: TreatmentGroup): void {
+    this.expandedTreatmentGroupKey = this.expandedTreatmentGroupKey === group.key ? null : group.key;
+    this.confirmingTreatmentGroupDeleteKey = null;
+  }
+
+  treatmentStatusLabel(status: MedicationTreatment['status']): string {
+    if (status === 'paused') return 'Pausado';
+    if (status === 'finished') return 'Finalizado';
+    return 'Activo';
+  }
+
+  treatmentDurationLabel(treatment: MedicationTreatment): string {
+    if (treatment.continuous) return 'Indefinido';
+    return `${this.daysBetween(treatment.startDate, treatment.endDate ?? treatment.startDate) + 1} días`;
+  }
+
+  treatmentFrequencyLabel(treatment: MedicationTreatment): string {
+    return this.medicationFrequencyLabel(this.inferMedicationFrequency(treatment.schedule.times));
+  }
+
+  medicationStockLabel(treatment: MedicationTreatment): string {
+    if (!treatment.stockEnabled) return '';
+    const days = this.medicationStockDays(treatment);
+    return `${this.formatStockAmount(treatment.stockQuantity)} ${treatment.stockUnit} · aprox. ${days} ${days === 1 ? 'día' : 'días'}`;
+  }
+
+  medicationStockDays(treatment: MedicationTreatment): number {
+    const dailyUse = Math.max(1, treatment.schedule.times.length) * treatment.doseUnits;
+    return Math.floor(treatment.stockQuantity / dailyUse);
+  }
+
+  isMedicationLowStock(treatment: MedicationTreatment): boolean {
+    return treatment.stockEnabled && treatment.stockQuantity <= treatment.lowStockThreshold;
+  }
+
+  iniciarReposicion(treatment: MedicationTreatment): void {
+    this.restockingMedicationId = treatment.id;
+    this.restockAmount = 0;
+  }
+
+  cancelarReposicion(): void {
+    this.restockingMedicationId = null;
+    this.restockAmount = 0;
+  }
+
+  confirmarReposicion(treatment: MedicationTreatment): void {
+    const quantity = Number(this.restockAmount);
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    this.medicationTreatments = this.wellnessService.addStock(treatment.id, quantity);
+    const updated = this.medicationTreatments.find((item) => item.id === treatment.id);
+    if (updated) void this.notificationScheduler.syncLowStockNotification(updated);
+    this.cancelarReposicion();
+  }
+
+  private formatStockAmount(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  }
+
+  treatmentTodayStats(group: TreatmentGroup): { taken: number; pending: number; overdue: number } {
+    const ids = new Set(group.treatments.map((item) => item.id));
+    const today = this.taskService.toISODate(this.currentTime);
+    return this.medicationDoses
+      .filter((dose) => ids.has(dose.treatmentId) && dose.scheduledAt.startsWith(today))
+      .reduce((stats, dose) => {
+        if (dose.status === 'taken') stats.taken += 1;
+        else if (this.isMedicationDoseOverdue(dose)) stats.overdue += 1;
+        else stats.pending += 1;
+        return stats;
+      }, { taken: 0, pending: 0, overdue: 0 });
+  }
+
+  cambiarEstadoTratamiento(group: TreatmentGroup, status: MedicationTreatment['status']): void {
+    this.medicationTreatments = this.wellnessService.setTreatmentsStatus(
+      group.treatments.map((item) => item.id),
+      status,
+    );
+    this.medicationDoses = this.wellnessService.getDoses();
+    this.buildCalendar();
+    this.syncNotifications();
+  }
+
+  eliminarGrupoTratamiento(group: TreatmentGroup): void {
+    this.medicationTreatments = this.wellnessService.deleteTreatments(
+      group.treatments.map((item) => item.id),
+    );
+    this.medicationDoses = this.wellnessService.getDoses();
+    this.expandedTreatmentGroupKey = null;
+    this.confirmingTreatmentGroupDeleteKey = null;
+    this.buildCalendar();
+    this.syncNotifications();
+  }
+
+  formatTreatmentDate(date: string): string {
+    if (!date) return 'Seleccionar fecha';
+    return new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
+      .format(new Date(`${date}T12:00:00`));
+  }
+
+  eliminarTratamiento(): void {
+    if (!this.editingMedicationId) return;
+    this.medicationTreatments = this.wellnessService.deleteTreatment(this.editingMedicationId);
+    this.medicationDoses = this.wellnessService.getDoses();
+    this.buildCalendar();
+    this.syncNotifications();
+    this.resetMedicationForm();
+    this.wellnessView = 'treatment';
+  }
+
+  medicationScheduleText(treatment: MedicationTreatment): string {
+    const days = treatment.schedule.days.length === 7
+      ? 'Todos los días'
+      : treatment.schedule.days.map((day) => this.diasSemana[day]).join(', ');
+    return `${days} · ${treatment.schedule.times.join(', ')}`;
+  }
+
+  get todayMedicationDoses(): MedicationDose[] {
+    const today = this.taskService.toISODate(this.currentTime);
+    return this.medicationDoses
+      .filter((dose) => dose.scheduledAt.startsWith(today))
+      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  }
+
+  get todayMedicationOverdueDoses(): MedicationDose[] {
+    return this.todayMedicationDoses.filter((dose) => this.isMedicationDoseOverdue(dose));
+  }
+
+  get todayMedicationPendingDoses(): MedicationDose[] {
+    return this.todayMedicationDoses.filter((dose) =>
+      (dose.status === 'pending' || dose.status === 'postponed') && !this.isMedicationDoseOverdue(dose));
+  }
+
+  get todayMedicationTakenDoses(): MedicationDose[] {
+    return this.todayMedicationDoses.filter((dose) => dose.status === 'taken');
+  }
+
+  get todayMedicationProgress(): number {
+    if (this.todayMedicationDoses.length === 0) return 0;
+    return Math.round((this.todayMedicationTakenDoses.length / this.todayMedicationDoses.length) * 100);
+  }
+
+  get selectedDateMedicationDoses(): MedicationDose[] {
+    return this.medicationDoses
+      .filter((dose) => dose.scheduledAt.startsWith(this.selectedDate))
+      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  }
+
+  medicationForDose(dose: MedicationDose): MedicationTreatment | undefined {
+    return this.medicationTreatments.find((item) => item.id === dose.treatmentId);
+  }
+
+  medicationDoseTime(dose: MedicationDose): string {
+    return dose.scheduledAt.slice(11, 16);
+  }
+
+  medicationDoseRecordedTime(dose: MedicationDose): string {
+    if (!dose.recordedAt) return '';
+    return new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' })
+      .format(new Date(dose.recordedAt));
+  }
+
+  isMedicationDoseOverdue(dose: MedicationDose): boolean {
+    if (dose.status !== 'pending') return false;
+    const scheduledAt = new Date(dose.scheduledAt).getTime();
+    return !Number.isNaN(scheduledAt) && scheduledAt < this.currentTime.getTime();
+  }
+
+  toggleMedicationDose(dose: MedicationDose): void {
+    this.medicationDoses = this.wellnessService.setDoseStatus(
+      dose.id,
+      dose.status === 'taken' ? 'pending' : 'taken',
+    );
+    this.medicationTreatments = this.wellnessService.getTreatments();
+    this.syncNotifications();
+  }
+
+  resetMedicationForm(): void {
+    this.editingMedicationId = null;
+    this.editingDraftKey = null;
+    this.medicationName = '';
+    this.medicationDose = '';
+    this.medicationInstructions = '';
+    this.medicationStartDate = this.treatmentStartDate || this.taskService.toISODate(new Date());
+    this.medicationEndDate = '';
+    this.medicationContinuous = false;
+    this.medicationDays = [0, 1, 2, 3, 4, 5, 6];
+    this.medicationTimes = ['08:00'];
+    this.medicationColor = '#22c55e';
+    this.medicationStrictTracking = false;
+    this.medicationStockEnabled = false;
+    this.medicationStockQuantity = 30;
+    this.medicationDoseUnits = 1;
+    this.medicationStockUnit = 'tabletas';
+    this.medicationLowStockThreshold = 5;
+    this.medicationFrequencyHours = 8;
+    this.medicationDurationDays = 4;
+    this.medicationFirstTime = '08:00';
+    this.confirmingMedicationDeletion = false;
+  }
+
+  private resetWellnessFlow(): void {
+    this.wellnessView = 'treatment';
+    this.treatmentName = '';
+    this.treatmentStartDate = '';
+    this.treatmentMedicationDrafts = [];
+    this.resetMedicationForm();
+  }
+
+  private volverAlAdministradorDeTratamientos(): void {
+    this.returnToTreatmentManager = false;
+    this.resetWellnessFlow();
+    void this.wellnessModal?.dismiss().then(() => this.abrirTratamientos());
+  }
+
+  private buildTreatmentDraft(startDate: string) {
+    const continuous = this.medicationDurationDays === null;
+    return {
+      treatmentName: this.treatmentName,
+      name: this.medicationName,
+      dose: this.medicationDose,
+      instructions: this.medicationInstructions,
+      startDate,
+      endDate: continuous ? undefined : this.addCalendarDays(startDate, (this.medicationDurationDays ?? 1) - 1),
+      continuous,
+      days: [0, 1, 2, 3, 4, 5, 6],
+      times: this.calculatedMedicationTimes,
+      color: this.medicationColor,
+      strictTracking: this.medicationStrictTracking,
+      stockEnabled: this.medicationStockEnabled,
+      stockQuantity: this.medicationStockQuantity,
+      doseUnits: this.medicationDoseUnits,
+      stockUnit: this.medicationStockUnit,
+      lowStockThreshold: this.medicationLowStockThreshold,
+    };
+  }
+
+  private inferMedicationFrequency(times: string[]): number {
+    if (times.length < 2) return 24;
+    const minutes = times
+      .map((time) => {
+        const [hours, mins] = time.split(':').map(Number);
+        return hours * 60 + mins;
+      })
+      .sort((a, b) => a - b);
+    const gaps = minutes.map((value, index) => {
+      const next = minutes[(index + 1) % minutes.length] + (index === minutes.length - 1 ? 24 * 60 : 0);
+      return next - value;
+    });
+    const frequency = Math.round(Math.min(...gaps) / 60);
+    return this.medicationFrequencyOptions.includes(frequency) ? frequency : 24;
+  }
+
+  private daysBetween(start: string, end: string): number {
+    const startDate = new Date(`${start}T12:00:00`).getTime();
+    const endDate = new Date(`${end}T12:00:00`).getTime();
+    return Math.max(0, Math.round((endDate - startDate) / 86_400_000));
+  }
+
+  private addCalendarDays(date: string, days: number): string {
+    const value = new Date(`${date}T12:00:00`);
+    value.setDate(value.getDate() + days);
+    return this.taskService.toISODate(value);
+  }
+
+  private createMedicationDraftKey(): string {
+    return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `medication-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  private createSubtaskId(): string {
+    return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `subtask-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  async abrirConfiguracionBateria(): Promise<void> {
+    await this.refreshBatteryOptimizationStatus();
+    await this.batteryModal?.present();
+  }
+
+  cerrarConfiguracionBateria(): void {
+    this.batteryModal?.dismiss();
+  }
+
+  async solicitarExclusionBateria(): Promise<void> {
+    await this.notificationScheduler.requestBatteryOptimizationExemption();
+  }
+
+  async abrirAjustesAplicacion(): Promise<void> {
+    await this.notificationScheduler.openAppSettings();
+  }
+
+  async abrirAjustesBateriaFabricante(): Promise<void> {
+    await this.notificationScheduler.openManufacturerBatterySettings();
+  }
+
+  get batteryManufacturerTitle(): string {
+    const titles: Record<string, string> = {
+      xos: 'XOS puede limitar Agenda',
+      xiaomi: 'HyperOS o MIUI puede limitar Agenda',
+      samsung: 'Samsung puede limitar Agenda',
+      huawei: 'Huawei puede limitar Agenda',
+      oppo: 'ColorOS puede limitar Agenda',
+      vivo: 'Vivo puede limitar Agenda',
+    };
+    return titles[this.batteryDeviceInfo.family] || 'Revisa la actividad en segundo plano';
+  }
+
+  get batteryManufacturerInstructions(): string {
+    const instructions: Record<string, string> = {
+      xos: 'Permite actividad en segundo plano, inicio automático y ejecución sin restricciones.',
+      xiaomi: 'Activa el inicio automático y selecciona Sin restricciones en Ahorro de batería.',
+      samsung: 'Quita Agenda de Aplicaciones en suspensión y permite actividad en segundo plano.',
+      huawei: 'En Inicio de aplicaciones, administra Agenda manualmente y permite las tres opciones.',
+      oppo: 'Activa inicio automático, actividad en segundo plano y Sin restricciones.',
+      vivo: 'Permite el inicio automático y el consumo de batería en segundo plano.',
+    };
+    return instructions[this.batteryDeviceInfo.family]
+      || 'Busca Agenda y permite su actividad en segundo plano sin restricciones.';
+  }
+
+  private async refreshBatteryOptimizationStatus(): Promise<void> {
+    this.batteryOptimizationStatus = 'checking';
+    try {
+      const [status, deviceInfo] = await Promise.all([
+        this.notificationScheduler.checkBatteryOptimization(),
+        this.notificationScheduler.getBatteryDeviceInfo(),
+      ]);
+      this.batteryDeviceInfo = deviceInfo;
+      this.batteryOptimizationStatus = !status.supported
+        ? 'unavailable'
+        : status.ignoring ? 'protected' : 'restricted';
+    } catch {
+      this.batteryOptimizationStatus = 'unavailable';
+    }
+    this.refreshView();
+  }
+
   async abrirCalendariosDispositivo(): Promise<void> {
     this.deviceCalendarSettings = this.deviceCalendarService.loadSettings();
     await this.deviceCalendarModal?.present();
@@ -1261,6 +2829,7 @@ export class HomePage implements OnInit, OnDestroy {
       this.deviceCalendarStatus = 'error';
       this.deviceCalendars = [];
     }
+    this.refreshView();
   }
 
   private async refreshDeviceCalendarEvents(): Promise<void> {
@@ -1273,6 +2842,7 @@ export class HomePage implements OnInit, OnDestroy {
       this.deviceCalendarTasks = [];
     }
     this.buildCalendar();
+    this.refreshView();
   }
 
   reminderSettingsFor(label: TaskLabel): LabelReminderSettings {
@@ -1331,13 +2901,45 @@ export class HomePage implements OnInit, OnDestroy {
   private syncNotifications(requestPermission = false): void {
     if (!this.reminderSettingsReady) return;
     void this.notificationScheduler
-      .sync(this.tareas, this.labelReminderSettings, requestPermission)
+      .sync(
+        this.tareas,
+        this.labelReminderSettings,
+        requestPermission,
+        this.medicationDoses,
+        this.medicationTreatments,
+        this.walletService.occurrences(this.currentTime, 0, 2),
+      )
       .then((result) => {
         this.notificationSyncStatus = result.status;
+        if (result.status === 'scheduled') {
+          for (const treatment of this.medicationTreatments) {
+            void this.notificationScheduler.syncLowStockNotification(treatment);
+          }
+        }
       })
       .catch(() => {
         this.notificationSyncStatus = 'error';
       });
+  }
+
+  private async handleNotificationAction(action: ActionPerformed): Promise<void> {
+    if (!['complete', 'snooze', 'discard'].includes(action.actionId)) return;
+    const taskId = Number(action.notification.extra?.taskId);
+    if (!Number.isInteger(taskId)) return;
+    const task = this.taskService.findById(taskId);
+    if (!task || task.tipo !== 'tarea') return;
+
+    if (action.actionId === 'snooze') {
+      this.prepararReagenda(task);
+      return;
+    }
+
+    this.setTasks(
+      action.actionId === 'complete'
+        ? this.taskService.complete(taskId)
+        : this.taskService.discard(taskId),
+    );
+    await this.notificationScheduler.clearTaskNotifications(taskId);
   }
 
   private addMinutesToTime(time: string, minutes: number): string {
@@ -1348,9 +2950,7 @@ export class HomePage implements OnInit, OnDestroy {
 
   tasksForHour(hour: string): Task[] {
     return this.selectedDateTasks.filter(
-      (tarea) =>
-        tarea.hora?.startsWith(hour.slice(0, 2)) &&
-        tarea.estado !== 'completada',
+      (tarea) => tarea.hora?.startsWith(hour.slice(0, 2)),
     );
   }
 
@@ -1381,16 +2981,14 @@ export class HomePage implements OnInit, OnDestroy {
     return this.taskService
       .getTasksForDate(date, this.calendarTasks)
       .filter(
-        (tarea) =>
-          tarea.hora?.startsWith(hour.slice(0, 2)) &&
-          tarea.estado !== 'completada',
+        (tarea) => tarea.hora?.startsWith(hour.slice(0, 2)),
       );
   }
 
   private layoutsForDate(date: string): Map<number, TimedEventLayout> {
     const timed = this.taskService
       .getTasksForDate(date, this.calendarTasks)
-      .filter((tarea) => !!tarea.hora && tarea.estado !== 'completada')
+      .filter((tarea) => !!tarea.hora)
       .map((tarea) => {
         const [hours, minutes] = tarea.hora!.split(':').map(Number);
         const start = hours * 60 + minutes;
@@ -1462,6 +3060,46 @@ export class HomePage implements OnInit, OnDestroy {
       .filter((section) => section.tareas.length > 0);
     this.buildCalendar();
     this.syncNotifications();
+    this.refreshView();
+  }
+
+  private refreshExpiredTasks(): void {
+    const previousStates = new Map(this.tareas.map((task) => [task.id, task.estado]));
+    const refreshed = this.taskService.refreshExpired(this.currentTime);
+    const changed = refreshed.some((task) => previousStates.get(task.id) !== task.estado);
+
+    if (changed) this.setTasks(refreshed);
+  }
+
+  private loadFabPosition(): void {
+    try {
+      const stored = JSON.parse(localStorage.getItem(this.fabPositionKey) ?? 'null') as {
+        x?: number;
+        y?: number;
+        width?: number;
+        height?: number;
+        side?: 'top' | 'bottom';
+      } | null;
+      if (!stored || !Number.isFinite(stored.x) || !Number.isFinite(stored.y)) return;
+
+      const widthScale = stored.width ? window.innerWidth / stored.width : 1;
+      const heightScale = stored.height ? window.innerHeight / stored.height : 1;
+      this.fabOffsetX = stored.x! * widthScale;
+      this.fabOffsetY = stored.y! * heightScale;
+      this.fabListSide = stored.side === 'bottom' ? 'bottom' : 'top';
+    } catch {
+      localStorage.removeItem(this.fabPositionKey);
+    }
+  }
+
+  private saveFabPosition(): void {
+    localStorage.setItem(this.fabPositionKey, JSON.stringify({
+      x: this.fabOffsetX,
+      y: this.fabOffsetY,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      side: this.fabListSide,
+    }));
   }
 
   private resetForm(fecha = ''): void {
@@ -1469,6 +3107,8 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaFecha = fecha;
     this.nuevaHora = '';
     this.nuevaHoraFin = '';
+    this.taskSubtasks = [];
+    this.newSubtaskTitle = '';
     this.eventColor = '#2563eb';
     this.prioridad = 'media';
     this.etiqueta = undefined;
@@ -1482,6 +3122,8 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaFecha = tarea.fecha ?? '';
     this.nuevaHora = tarea.hora ?? '';
     this.nuevaHoraFin = this.taskEndTime(tarea);
+    this.taskSubtasks = tarea.subtasks?.map((subtask) => ({ ...subtask })) ?? [];
+    this.newSubtaskTitle = '';
     this.eventColor = tarea.color ?? '#2563eb';
     this.prioridad = tarea.prioridad;
     this.etiqueta = tarea.etiqueta;
@@ -1507,7 +3149,8 @@ export class HomePage implements OnInit, OnDestroy {
         iso,
         currentMonth: date.getMonth() === month,
         selected: iso === this.selectedDate,
-        hasTasks: this.taskService.hasTasksOnDate(iso, this.calendarTasks),
+        hasTasks: this.taskService.hasTasksOnDate(iso, this.calendarTasks) ||
+          this.medicationDoses.some((dose) => dose.scheduledAt.startsWith(iso)),
       };
     });
   }

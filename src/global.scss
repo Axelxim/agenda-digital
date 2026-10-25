@@ -93,6 +93,369 @@ app-home .home-task-card.done .home-task-info h3 {
   text-decoration: line-through;
 }
 
+app-home .agenda-task.done,
+app-home .month-event.done {
+  opacity: .62;
+}
+
+app-home .agenda-task.done strong,
+app-home .month-event.done strong {
+  text-decoration: line-through;
+}
+
+app-home .current-event-check {
+  --checkbox-background: transparent;
+  --border-color: var(--event-color);
+  --border-color-checked: var(--event-color);
+  --checkbox-background-checked: var(--event-color);
+  --checkmark-color: #fff;
+  --size: 22px;
+}
+
+app-home .calendar-completed-check {
+  margin-left: 4px;
+  color: #22c55e;
+  font-size: 17px;
+  vertical-align: middle;
+}
+
+app-home .today-fab {
+  transform: translate3d(var(--fab-x, 0), var(--fab-y, 0), 0);
+  transition: transform 180ms ease-out;
+}
+
+app-home .today-fab.dragging {
+  transition: none;
+}
+
+app-home .today-fab > ion-fab-button {
+  touch-action: none;
+}
+
+app-home .wellness-toggle-entry {
+  cursor: default;
+}
+
+app-home .wellness-icon {
+  background: color-mix(in srgb, #22c55e 16%, var(--surface));
+  color: #22c55e;
+}
+
+.wellness-modal .wellness-manager,
+.wellness-modal .wellness-editor {
+  display: grid;
+  gap: 16px;
+  padding: 20px 16px 32px;
+}
+
+.wellness-modal .wellness-heading,
+.wellness-modal .wellness-heading > div,
+.wellness-modal .treatment-card > span:nth-child(2),
+.wellness-modal .wellness-schedule-block {
+  display: grid;
+  gap: 4px;
+}
+
+.wellness-modal .wellness-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.wellness-modal .wellness-heading h2,
+.wellness-modal .wellness-heading span {
+  margin: 0;
+}
+
+.wellness-modal .wellness-heading span,
+.wellness-modal .treatment-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wellness-modal .treatment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.wellness-modal .treatment-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--treatment-color);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.wellness-modal .treatment-mark {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--treatment-color) 16%, var(--surface));
+  color: var(--treatment-color);
+  font-size: 20px;
+}
+
+.wellness-modal .wellness-notes ion-textarea {
+  width: 100%;
+}
+
+.wellness-modal .wellness-setting-row {
+  min-height: 58px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.wellness-modal .wellness-block-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wellness-modal .wellness-block-heading button,
+.wellness-modal .medication-times button {
+  min-height: 38px;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+}
+
+.wellness-modal .wellness-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.wellness-modal .wellness-days button {
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.wellness-modal .wellness-days button.selected {
+  border-color: #22c55e;
+  background: color-mix(in srgb, #22c55e 18%, var(--surface));
+  color: #22c55e;
+}
+
+.wellness-modal .medication-times {
+  display: grid;
+  gap: 8px;
+}
+
+.wellness-modal .medication-times > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.wellness-modal .medication-times ion-input {
+  --padding-start: 12px;
+}
+
+.wellness-modal .medication-times button {
+  color: #ef4444;
+}
+
+app-home .wellness-toggle-entry.enabled {
+  cursor: pointer;
+}
+
+app-home .medication-home-section {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+app-home .medication-day-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 10px;
+  align-items: center;
+}
+
+app-home .medication-day-progress > span {
+  overflow: hidden;
+  height: 6px;
+  border-radius: 3px;
+  background: #242d3a;
+}
+
+app-home .medication-day-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #31c894;
+  transition: width 180ms ease;
+}
+
+app-home .medication-day-progress small {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+
+app-home .medication-dose-group {
+  display: grid;
+  gap: 7px;
+}
+
+app-home .medication-dose-group h3 {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 2px 0 0;
+  color: #c9d2df;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+app-home .medication-dose-group h3 ion-icon {
+  color: #72a7ff;
+  font-size: 16px;
+}
+
+app-home .medication-dose-group h3 span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+app-home .medication-dose-group.overdue-group h3,
+app-home .medication-dose-group.overdue-group h3 ion-icon {
+  color: #ff7588;
+}
+
+app-home .medication-dose-group.taken-group h3 ion-icon {
+  color: #31c894;
+}
+
+app-home .medication-dose-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 68px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--treatment-color) 38%, var(--border));
+  border-left: 4px solid var(--treatment-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--treatment-color) 8%, var(--surface));
+}
+
+app-home .medication-dose-card > span {
+  display: grid;
+  gap: 4px;
+}
+
+app-home .medication-dose-card small {
+  color: var(--muted);
+}
+
+app-home .medication-dose-card .medication-stock {
+  font-size: 10px;
+}
+
+app-home .medication-dose-card .medication-stock.low {
+  color: #ff7588;
+  font-weight: 600;
+}
+
+app-home .medication-dose-card .medication-dose-state {
+  color: #31c894;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+app-home .medication-dose-card > ion-icon {
+  color: var(--treatment-color);
+  font-size: 20px;
+}
+
+app-home .medication-dose-card.done {
+  opacity: .65;
+}
+
+app-home .medication-dose-card.done strong {
+  text-decoration: line-through;
+}
+
+app-home .medication-dose-card.overdue {
+  --treatment-color: #ff4d67 !important;
+  border-color: #8f2638;
+  background: #28151c;
+}
+
+app-home .medication-dose-card.overdue .medication-dose-state {
+  color: #ff7588;
+  font-weight: 600;
+}
+
+app-home .calendar-medication-list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 8px 52px;
+}
+
+app-home .calendar-medication-dose {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 7px;
+  align-items: center;
+  min-height: 42px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, var(--treatment-color) 38%, var(--border));
+  border-left: 3px solid var(--treatment-color);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--treatment-color) 9%, var(--surface));
+}
+
+app-home .calendar-medication-dose > ion-icon:first-child,
+app-home .calendar-medication-dose .dose-status {
+  color: var(--treatment-color);
+}
+
+app-home .calendar-medication-dose strong,
+app-home .calendar-medication-dose small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-home .calendar-medication-dose small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+app-home .calendar-medication-dose.done {
+  opacity: .65;
+}
+
+app-home .calendar-medication-dose.overdue {
+  --treatment-color: #ff4d67 !important;
+  border-color: #8f2638;
+  background: #28151c;
+}
+
+app-home .month-medications {
+  margin-left: 0;
+}
+
 app-home .home-task-summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 44px;
@@ -211,6 +574,61 @@ app-home .home-task-actions .discard-action {
   color: #ff5263;
 }
 
+app-home .task-subtask-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 8px;
+  align-items: center;
+  margin-top: 7px;
+}
+
+app-home .task-subtask-progress > span {
+  overflow: hidden;
+  height: 4px;
+  border-radius: 2px;
+  background: #303a4b;
+}
+
+app-home .task-subtask-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #5595ff;
+}
+
+app-home .task-subtask-progress small {
+  color: #9fabbc;
+  font-size: 10px;
+  text-align: right;
+}
+
+app-home .home-subtask-list {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-top: 1px solid #303a4b;
+  background: #0f151e;
+}
+
+app-home .home-subtask-list label {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  min-height: 38px;
+  color: #d4dbe6;
+  font-size: 12px;
+}
+
+app-home .home-subtask-list label.completed span {
+  color: #7f8b9d;
+  text-decoration: line-through;
+}
+
+app-home .home-subtask-list ion-checkbox {
+  --size: 19px;
+}
+
 app-home .reschedule-icon {
   position: relative;
   width: 27px;
@@ -243,16 +661,960 @@ app-home .reschedule-icon ion-icon:last-child {
   app-home .home-task-actions button { font-size: 11px; }
 }
 
+ion-menu.settings-side-menu {
+  --width: min(86vw, 360px);
+  --background: var(--bg, #10131a);
+}
+
+ion-menu.settings-side-menu::part(container) {
+  border-left: 1px solid var(--border, #2a3242);
+  box-shadow: -14px 0 34px rgba(0, 0, 0, .32);
+}
+
+ion-menu.settings-side-menu::part(backdrop) {
+  background: rgba(0, 0, 0, .56);
+}
+
+.settings-side-menu ion-toolbar {
+  --background: var(--surface, #171b24);
+  --color: var(--text, #f4f7fb);
+  border-bottom: 1px solid var(--border, #2a3242);
+}
+
+.settings-side-menu ion-content {
+  --background: var(--bg, #10131a);
+  --color: var(--text, #f4f7fb);
+}
+
+.settings-side-menu .settings-side-nav {
+  display: grid;
+  gap: 8px;
+  padding: 18px 12px max(24px, env(safe-area-inset-bottom));
+}
+
+.settings-side-menu .settings-side-nav > p {
+  margin: 0 8px 4px;
+  color: var(--muted, #a5b0c3);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.settings-side-menu .settings-side-nav > button {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto 18px;
+  gap: 10px;
+  align-items: center;
+  min-height: 72px;
+  padding: 10px;
+  border: 1px solid var(--border, #2a3242);
+  border-radius: 8px;
+  background: var(--surface, #171b24);
+  color: var(--text, #f4f7fb);
+  text-align: left;
+}
+
+.settings-side-menu .settings-side-nav > button > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-side-menu .settings-side-nav strong,
+.settings-side-menu .settings-side-nav small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-side-menu .settings-side-nav strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-side-menu .settings-side-nav small {
+  color: var(--muted, #a5b0c3);
+  font-size: 11px;
+}
+
+.settings-side-menu .settings-side-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary, #5aa2ff) 15%, var(--surface, #171b24));
+  color: var(--primary, #5aa2ff);
+  font-size: 21px;
+}
+
+.settings-side-menu .settings-side-icon.alarm {
+  background: color-mix(in srgb, #f59e0b 14%, var(--surface, #171b24));
+  color: #f6ad2f;
+}
+
+.settings-side-menu .settings-side-state {
+  color: #31c894;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.settings-side-menu .settings-side-state.attention {
+  color: #ff7588;
+}
+
+.settings-side-menu .settings-side-nav > button > ion-icon {
+  color: var(--muted, #a5b0c3);
+  font-size: 18px;
+}
+
+.settings-side-menu .settings-side-toggle {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 72px;
+  padding: 10px;
+  border: 1px solid var(--border, #2a3242);
+  border-radius: 8px;
+  background: var(--surface, #171b24);
+  color: var(--text, #f4f7fb);
+}
+
+.settings-side-menu .settings-side-toggle > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-side-menu .settings-side-toggle strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-side-menu .settings-side-toggle small {
+  color: var(--muted, #a5b0c3);
+  font-size: 11px;
+}
+
+.task-editor-modal .subtask-editor {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.task-editor-modal .subtask-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #f4f4f4;
+  font-size: 13px;
+}
+
+.task-editor-modal .subtask-editor-heading span {
+  color: #9fa8b6;
+  font-size: 11px;
+}
+
+.task-editor-modal .subtask-editor-list {
+  overflow: hidden;
+  border: 1px solid #484f5a;
+  border-radius: 8px;
+}
+
+.task-editor-modal .subtask-editor-row,
+.task-editor-modal .subtask-add-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 42px;
+  gap: 7px;
+  align-items: center;
+  min-height: 50px;
+  padding: 4px 6px 4px 10px;
+  background: #22262d;
+}
+
+.task-editor-modal .subtask-editor-row + .subtask-editor-row {
+  border-top: 1px solid #404650;
+}
+
+.task-editor-modal .subtask-editor-row ion-input,
+.task-editor-modal .subtask-add-row ion-input {
+  --background: transparent;
+  --padding-start: 4px;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+}
+
+.task-editor-modal .subtask-editor-row.completed ion-input {
+  opacity: .58;
+  text-decoration: line-through;
+}
+
+.task-editor-modal .subtask-editor-row button,
+.task-editor-modal .subtask-add-row button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #ff657c;
+  font-size: 19px;
+}
+
+.task-editor-modal .subtask-add-row {
+  grid-template-columns: minmax(0, 1fr) 42px;
+  padding-left: 10px;
+  border: 1px dashed #4c5a70;
+  border-radius: 8px;
+  background: #1a1e25;
+}
+
+.task-editor-modal .subtask-add-row button {
+  color: #72a7ff;
+}
+
+.task-editor-modal .subtask-add-row button:disabled {
+  opacity: .35;
+}
+
+ion-modal.global-search-modal {
+  --height: min(720px, calc(100dvh - 32px));
+}
+
+.more-view .preset-entry-icon.note-icon,
+.global-search-modal .global-search-icon[data-kind='note'] {
+  background: rgba(245, 183, 66, .13);
+  color: #f5b742;
+}
+
+.more-view .preset-entry-icon.wallet-icon {
+  background: rgba(45, 190, 133, .14);
+  color: #36d399;
+}
+
+app-home .wallet-home-section {
+  margin-bottom: 18px;
+}
+
+app-home .wallet-home-section .home-section-heading ion-icon {
+  color: #36d399;
+}
+
+app-home .wallet-due-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 72px;
+  gap: 12px;
+  align-items: center;
+  min-height: 66px;
+  padding: 10px 12px;
+  border: 1px solid #315144;
+  border-left: 4px solid #36d399;
+  border-radius: 8px;
+  background: #12231f;
+  color: #f4f7fb;
+}
+
+app-home .wallet-due-card.today {
+  border-color: #e8a33c;
+  border-left-color: #f5ad3d;
+  background: #251d12;
+}
+
+app-home .wallet-due-card > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+app-home .wallet-due-card strong,
+app-home .wallet-due-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+app-home .wallet-due-card small {
+  color: #a7b4c5;
+  font-size: 11px;
+}
+
+app-home .wallet-due-card button {
+  min-height: 36px;
+  border: 1px solid #36d399;
+  border-radius: 6px;
+  background: transparent;
+  color: #55dfac;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+ion-modal.wallet-modal {
+  --height: min(780px, calc(100dvh - 24px));
+}
+
+.wallet-modal .wallet-view,
+.wallet-modal .wallet-form {
+  display: grid;
+  gap: 14px;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 14px 14px max(30px, env(safe-area-inset-bottom));
+}
+
+.wallet-modal .wallet-balance-band {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid #315144;
+  border-radius: 8px;
+  background: #12231f;
+}
+
+.wallet-modal .wallet-balance-band span,
+.wallet-modal .wallet-balance-band small {
+  color: #a8b7c4;
+  font-size: 11px;
+}
+
+.wallet-modal .wallet-balance-band strong {
+  color: #55dfac;
+  font-size: 28px;
+}
+
+.wallet-modal .wallet-balance-band strong.negative {
+  color: #ff657c;
+}
+
+.wallet-modal .wallet-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #2d3747;
+  border-radius: 8px;
+}
+
+.wallet-modal .wallet-summary-grid > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 8px;
+  text-align: center;
+}
+
+.wallet-modal .wallet-summary-grid > div + div {
+  border-left: 1px solid #2d3747;
+}
+
+.wallet-modal .wallet-summary-grid span {
+  color: #96a2b5;
+  font-size: 10px;
+}
+
+.wallet-modal .wallet-summary-grid strong {
+  overflow: hidden;
+  color: #f4f7fb;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallet-modal .wallet-command-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.wallet-modal .wallet-command-row button {
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  min-height: 62px;
+  padding: 7px 3px;
+  border: 1px solid #344156;
+  border-radius: 8px;
+  background: #182233;
+  color: #82b2ff;
+  font-size: 10px;
+}
+
+.wallet-modal .wallet-command-row ion-icon {
+  font-size: 20px;
+}
+
+.wallet-modal .wallet-section {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #2d3747;
+  border-radius: 8px;
+  background: #131923;
+}
+
+.wallet-modal .wallet-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2d3747;
+}
+
+.wallet-modal .wallet-section-title h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.wallet-modal .wallet-section-title span {
+  color: #92a0b3;
+  font-size: 10px;
+}
+
+.wallet-modal .wallet-list-row,
+.wallet-modal .wallet-movement-row,
+.wallet-modal .wallet-fixed-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 58px;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  min-height: 62px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid #273140;
+  background: transparent;
+  color: #f4f7fb;
+  text-align: left;
+}
+
+.wallet-modal .wallet-list-row:last-child,
+.wallet-modal .wallet-movement-row:last-child,
+.wallet-modal .wallet-fixed-row:last-child {
+  border-bottom: 0;
+}
+
+.wallet-modal .wallet-list-row > span,
+.wallet-modal .wallet-movement-row > span,
+.wallet-modal .wallet-fixed-row > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wallet-modal .wallet-list-row strong,
+.wallet-modal .wallet-list-row small,
+.wallet-modal .wallet-movement-row strong,
+.wallet-modal .wallet-movement-row small,
+.wallet-modal .wallet-fixed-row strong,
+.wallet-modal .wallet-fixed-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallet-modal .wallet-list-row small,
+.wallet-modal .wallet-movement-row small,
+.wallet-modal .wallet-fixed-row small {
+  color: #9da8ba;
+  font-size: 10px;
+}
+
+.wallet-modal .wallet-list-row b,
+.wallet-modal .wallet-movement-row b,
+.wallet-modal .wallet-fixed-row b {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wallet-modal .wallet-list-row button,
+.wallet-modal .wallet-movement-row button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: #1b2b27;
+  color: #55dfac;
+  font-size: 10px;
+}
+
+.wallet-modal .wallet-list-row.overdue {
+  box-shadow: inset 3px 0 #ff4d67;
+}
+
+.wallet-modal .wallet-movement-row.income b {
+  color: #55dfac;
+}
+
+.wallet-modal .wallet-movement-row:not(.income) b,
+.wallet-modal .wallet-movement-row button {
+  color: #ff7588;
+}
+
+.wallet-modal .wallet-fixed-row {
+  grid-template-columns: minmax(0, 1fr) auto 24px;
+}
+
+.wallet-modal .wallet-empty {
+  margin: 0;
+  padding: 22px 12px;
+  color: #929daf;
+  font-size: 11px;
+  text-align: center;
+}
+
+.wallet-modal .wallet-form ion-input,
+.wallet-modal .wallet-form ion-select {
+  --background: #080d14;
+  --color: #f4f7fb;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  min-height: 58px;
+  border: 1px solid #344156;
+  border-radius: 8px;
+}
+
+.wallet-modal .wallet-payment-reference {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #315144;
+  border-radius: 8px;
+  background: #12231f;
+}
+
+.wallet-modal .wallet-payment-reference > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wallet-modal .wallet-payment-reference > span:last-child {
+  text-align: right;
+}
+
+.wallet-modal .wallet-payment-reference strong,
+.wallet-modal .wallet-payment-reference b {
+  color: #f4f7fb;
+}
+
+.wallet-modal .wallet-payment-reference small {
+  color: #a8b7c4;
+  font-size: 11px;
+}
+
+.wallet-modal .wallet-kind-switch,
+.wallet-modal .wallet-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.wallet-modal .wallet-kind-switch button {
+  min-height: 42px;
+  border: 1px solid #344156;
+  border-radius: 7px;
+  background: #131923;
+  color: #a7b2c3;
+}
+
+.wallet-modal .wallet-kind-switch button.active {
+  border-color: #5798ff;
+  background: #172641;
+  color: #82b2ff;
+}
+
+.wallet-modal .wallet-primary,
+.wallet-modal .wallet-danger {
+  min-height: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: #e7ecf4;
+  color: #111722;
+  font-weight: 600;
+}
+
+.wallet-modal .wallet-primary:disabled {
+  opacity: .42;
+}
+
+.wallet-modal .wallet-danger {
+  border: 1px solid #ff657c;
+  background: transparent;
+  color: #ff657c;
+}
+
+@media (max-width: 430px) {
+  app-home .wallet-due-card { grid-template-columns: minmax(0, 1fr) auto; }
+  app-home .wallet-due-card button { grid-column: 1 / -1; }
+  .wallet-modal .wallet-summary-grid { grid-template-columns: 1fr; }
+  .wallet-modal .wallet-summary-grid > div + div { border-top: 1px solid #2d3747; border-left: 0; }
+  .wallet-modal .wallet-command-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wallet-modal .wallet-list-row,
+  .wallet-modal .wallet-movement-row { grid-template-columns: minmax(0, 1fr) auto 48px; }
+}
+
+ion-modal.quick-notes-modal {
+  --height: min(700px, calc(100dvh - 32px));
+}
+
+.quick-notes-modal .quick-notes-view,
+.quick-notes-modal .quick-note-editor {
+  display: grid;
+  gap: 14px;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 14px 14px max(30px, env(safe-area-inset-bottom));
+}
+
+.quick-notes-modal .new-note-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px dashed #4b5d76;
+  border-radius: 8px;
+  background: transparent;
+  color: #82b2ff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.quick-notes-modal .new-note-button ion-icon {
+  font-size: 20px;
+}
+
+.quick-notes-modal .quick-notes-list {
+  overflow: hidden;
+  border: 1px solid #2d3747;
+  border-radius: 8px;
+  background: #131923;
+}
+
+.quick-notes-modal .quick-note-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 176px;
+  min-height: 76px;
+  border-bottom: 1px solid #293342;
+}
+
+.quick-notes-modal .quick-note-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-left: 1px solid #293342;
+}
+
+.quick-notes-modal .quick-note-card-actions button {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 100%;
+  padding: 7px;
+  border: 0;
+  background: #111a27;
+  color: #82b2ff;
+  font-size: 11px;
+}
+
+.quick-notes-modal .quick-note-card-actions button + button {
+  border-left: 1px solid #293342;
+}
+
+.quick-notes-modal .quick-note-card-actions ion-icon {
+  flex: 0 0 auto;
+  font-size: 17px;
+}
+
+.quick-notes-modal .quick-note-card-actions span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-notes-modal .quick-note-item:last-child {
+  border-bottom: 0;
+}
+
+.quick-notes-modal .quick-note-content {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  padding: 11px 8px 11px 14px;
+  border: 0;
+  background: transparent;
+  color: #f4f7fb;
+  text-align: left;
+}
+
+.quick-notes-modal .quick-note-content strong,
+.quick-notes-modal .quick-note-content span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-notes-modal .quick-note-content strong {
+  font-size: 14px;
+}
+
+.quick-notes-modal .quick-note-content span,
+.quick-notes-modal .quick-note-content small {
+  color: #9da8ba;
+  font-size: 11px;
+}
+
+.quick-notes-modal .quick-notes-empty {
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  padding: 64px 24px;
+  color: #929daf;
+  text-align: center;
+}
+
+.quick-notes-modal .quick-notes-empty ion-icon {
+  color: #f5b742;
+  font-size: 30px;
+}
+
+.quick-notes-modal .quick-notes-empty strong {
+  color: #f4f7fb;
+  font-size: 15px;
+}
+
+.quick-notes-modal .quick-notes-empty span {
+  max-width: 300px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.quick-notes-modal .quick-note-editor > label {
+  display: grid;
+  gap: 7px;
+  color: #d8deea;
+  font-size: 12px;
+}
+
+.quick-notes-modal .quick-note-editor ion-input,
+.quick-notes-modal .quick-note-editor ion-textarea {
+  --background: #080d14;
+  --color: #f4f7fb;
+  --placeholder-color: #7f8b9d;
+  --padding-start: 13px;
+  --padding-end: 13px;
+  border: 1px solid #344156;
+  border-radius: 8px;
+}
+
+.quick-notes-modal .quick-note-body ion-textarea {
+  min-height: 220px;
+}
+
+.quick-notes-modal .quick-note-editor-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.quick-notes-modal .quick-note-editor-actions > button {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid #344156;
+  border-radius: 8px;
+  background: #182233;
+  color: #82b2ff;
+  font-size: 12px;
+}
+
+.quick-notes-modal .quick-note-editor-actions > button:disabled {
+  opacity: .4;
+}
+
+.quick-notes-modal .quick-note-editor-actions > button.danger {
+  color: #ff657c;
+}
+
+@media (max-width: 380px) {
+  .quick-notes-modal .quick-note-editor-actions { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .quick-notes-modal .quick-note-item {
+    grid-template-columns: minmax(0, 1fr) 96px;
+  }
+
+  .quick-notes-modal .quick-note-card-actions button {
+    padding: 5px;
+  }
+
+  .quick-notes-modal .quick-note-card-actions span {
+    display: none;
+  }
+}
+
+.global-search-modal .global-search-view {
+  display: grid;
+  gap: 10px;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 12px 12px 28px;
+}
+
+.global-search-modal ion-searchbar {
+  --background: #080d14;
+  --color: #f4f7fb;
+  --icon-color: #72a7ff;
+  --placeholder-color: #8f9bad;
+  --clear-button-color: #a5b0c3;
+  padding: 0;
+}
+
+.global-search-modal .global-search-count {
+  padding: 0 4px;
+  color: #a5b0c3;
+  font-size: 11px;
+}
+
+.global-search-modal .global-search-results {
+  overflow: hidden;
+  border: 1px solid #2a3445;
+  border-radius: 8px;
+  background: #131923;
+}
+
+.global-search-modal .global-search-results > button {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto 18px;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 66px;
+  padding: 9px 11px;
+  border: 0;
+  border-bottom: 1px solid #273140;
+  background: transparent;
+  color: #f4f7fb;
+  text-align: left;
+}
+
+.global-search-modal .global-search-results > button:last-child {
+  border-bottom: 0;
+}
+
+.global-search-modal .global-search-results > button > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.global-search-modal .global-search-results strong,
+.global-search-modal .global-search-results small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-search-modal .global-search-results strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.global-search-modal .global-search-results small {
+  color: #a5b0c3;
+  font-size: 11px;
+}
+
+.global-search-modal .global-search-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(85, 149, 255, .13);
+  color: #72a7ff;
+  font-size: 20px;
+}
+
+.global-search-modal .global-search-icon[data-kind='birthday'] {
+  background: rgba(196, 91, 134, .14);
+  color: #d77aa0;
+}
+
+.global-search-modal .global-search-icon[data-kind='treatment'],
+.global-search-modal .global-search-icon[data-kind='medication'] {
+  background: rgba(49, 200, 148, .13);
+  color: #31c894;
+}
+
+.global-search-modal .global-search-kind {
+  color: #82b2ff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.global-search-modal .global-search-results > button > ion-icon {
+  color: #7f8b9d;
+  font-size: 17px;
+}
+
+.global-search-modal .global-search-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 54px 16px;
+  color: #a5b0c3;
+}
+
+.global-search-modal .global-search-empty ion-icon {
+  font-size: 28px;
+}
+
+.global-search-modal .global-search-empty strong {
+  color: #f4f7fb;
+  font-size: 14px;
+}
+
 ion-modal.settings-reminder-modal {
   --width: min(620px, calc(100% - 24px));
-  --height: min(760px, calc(100dvh - 24px));
+  --height: min(720px, calc(100dvh - 64px));
   --border-radius: 12px;
   --background: #10131a;
+}
+
+ion-modal.settings-reminder-modal.wallet-modal {
+  --height: min(720px, calc(100dvh - 64px));
 }
 
 ion-modal.settings-reminder-modal::part(content) {
   border: 1px solid #303a4b;
   box-shadow: 0 18px 44px rgba(0, 0, 0, .45);
+}
+
+ion-modal.settings-reminder-modal ion-content {
+  --padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+ion-modal.wellness-modal {
+  --height: min(720px, calc(100dvh - 64px));
+}
+
+ion-modal.treatments-manager-modal {
+  --height: min(720px, calc(100dvh - 64px));
+}
+
+ion-modal.wellness-modal ion-content,
+ion-modal.treatments-manager-modal ion-content {
+  --padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
 .settings-reminder-modal .reminder-settings {
@@ -403,8 +1765,802 @@ ion-modal.settings-reminder-modal::part(content) {
   color-scheme: dark;
 }
 
+.settings-reminder-modal .battery-settings {
+  gap: 16px;
+}
+
+.settings-reminder-modal .battery-status {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 72px;
+  padding: 12px;
+  border: 1px solid #713737;
+  border-radius: 8px;
+  background: #24191d;
+}
+
+.settings-reminder-modal .battery-status.protected {
+  border-color: #176b54;
+  background: #10241f;
+}
+
+.settings-reminder-modal .battery-status-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, .14);
+  color: #ff6b6b;
+  font-size: 23px;
+}
+
+.settings-reminder-modal .battery-status.protected .battery-status-icon {
+  background: rgba(45, 212, 159, .14);
+  color: #2dd49f;
+}
+
+.settings-reminder-modal .battery-status > span:last-child,
+.settings-reminder-modal .battery-oem-note {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-reminder-modal .battery-status strong,
+.settings-reminder-modal .battery-oem-note strong {
+  color: #f4f7fb;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-reminder-modal .battery-status small,
+.settings-reminder-modal .battery-oem-note small {
+  color: #a5b0c3;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.settings-reminder-modal .battery-oem-note {
+  padding: 14px 0;
+  border-top: 1px solid #303a4b;
+  border-bottom: 1px solid #303a4b;
+}
+
+.wellness-modal .treatment-builder,
+.wellness-modal .medication-quick-editor {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 16px 14px 24px;
+}
+
+.wellness-modal .treatment-start-block,
+.wellness-modal .treatment-builder-heading,
+.wellness-modal .treatment-draft-card > div,
+.wellness-modal .medication-quick-field,
+.wellness-modal .treatment-calculation > div,
+.wellness-modal .calculated-times {
+  display: grid;
+  gap: 7px;
+}
+
+.wellness-modal .treatment-start-block > span,
+.wellness-modal .medication-quick-field > span {
+  color: #d8deea;
+  font-size: 14px;
+}
+
+.wellness-modal .treatment-date-picker {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px solid #354052;
+  border-radius: 8px;
+  background: #090d13;
+  color: #f4f7fb;
+}
+
+.wellness-modal .treatment-date-picker ion-icon {
+  color: #b7c2d2;
+  font-size: 20px;
+}
+
+.wellness-modal .treatment-date-picker input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.wellness-modal .treatment-builder-divider {
+  height: 1px;
+  background: #252d3a;
+}
+
+.wellness-modal .treatment-builder-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.wellness-modal .treatment-builder-heading h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.wellness-modal .treatment-builder-heading span {
+  color: #a5b0c3;
+  font-size: 12px;
+}
+
+.wellness-modal .treatment-draft-list {
+  display: grid;
+  gap: 4px;
+}
+
+.wellness-modal .treatment-draft-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 10px;
+  align-items: start;
+  min-height: 92px;
+  padding: 11px 12px;
+  border-bottom: 1px solid #252d3a;
+  color: #f4f7fb;
+}
+
+.wellness-modal .treatment-draft-card span,
+.wellness-modal .treatment-draft-card small {
+  color: #c2cad7;
+  font-size: 13px;
+}
+
+.wellness-modal .treatment-draft-card small {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-top: 8px;
+  color: #9da9ba;
+  font-size: 12px;
+}
+
+.wellness-modal .treatment-draft-card button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #c7d0df;
+  font-size: 19px;
+}
+
+.wellness-modal .add-treatment-medication,
+.wellness-modal .save-treatment-button,
+.wellness-modal .save-medication-button {
+  min-height: 48px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wellness-modal .add-treatment-medication {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #3b4658;
+  background: transparent;
+  color: #f4f7fb;
+}
+
+.wellness-modal .save-treatment-button,
+.wellness-modal .save-medication-button {
+  border: 0;
+  background: #dce8ff;
+  color: #0a1220;
+}
+
+.wellness-modal .save-treatment-button:disabled,
+.wellness-modal .save-medication-button:disabled {
+  opacity: .42;
+}
+
+.wellness-modal .medication-quick-field em {
+  color: #ff9b62;
+  font-style: normal;
+}
+
+.wellness-modal .medication-quick-field ion-input,
+.wellness-modal .medication-quick-field ion-select {
+  --background: #0a0e15;
+  --color: #f4f7fb;
+  --placeholder-color: #8f9bad;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  min-height: 52px;
+  border: 1px solid #566174;
+  border-radius: 8px;
+  color-scheme: dark;
+}
+
+.wellness-modal .medication-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wellness-modal .first-dose-field {
+  max-width: 240px;
+}
+
+.wellness-modal .medication-stock-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 8px 12px;
+  border: 1px solid #354052;
+  border-radius: 8px;
+  background: #111722;
+}
+
+.wellness-modal .medication-stock-toggle > span {
+  display: grid;
+  gap: 3px;
+}
+
+.wellness-modal .medication-stock-toggle small {
+  color: #9fabbc;
+  font-size: 11px;
+}
+
+.wellness-modal .medication-stock-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #303b4c;
+  border-radius: 8px;
+  background: #0d131d;
+}
+
+.wellness-modal .treatment-calculation {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 13px;
+  align-items: center;
+  min-height: 90px;
+  padding: 12px;
+  border: 1px solid #4a566c;
+  border-radius: 8px;
+  background: #1a202d;
+}
+
+.wellness-modal .calculation-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 50%;
+  background: #29334a;
+  color: #a8c7ff;
+  font-size: 25px;
+}
+
+.wellness-modal .treatment-calculation span,
+.wellness-modal .calculated-times strong > span {
+  color: #b4bfd0;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.wellness-modal .calculation-total {
+  text-align: right;
+}
+
+.wellness-modal .calculated-times > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wellness-modal .calculated-times > div > span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #505b6d;
+  border-radius: 8px;
+  background: #1a1f29;
+  color: #e7ecf4;
+}
+
+.wellness-modal .save-medication-button {
+  margin-top: auto;
+}
+
+.treatments-manager-modal .treatments-manager {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 14px 12px 28px;
+}
+
+.treatments-manager-modal .treatment-group-list {
+  display: grid;
+  gap: 10px;
+}
+
+.treatments-manager-modal .treatment-group {
+  overflow: hidden;
+  border: 1px solid #303b4c;
+  border-left: 4px solid #2dd49f;
+  border-radius: 8px;
+  background: #121923;
+}
+
+.treatments-manager-modal .treatment-group.paused {
+  border-left-color: #f59e0b;
+}
+
+.treatments-manager-modal .treatment-group.finished {
+  border-left-color: #758197;
+  opacity: .82;
+}
+
+.treatments-manager-modal .treatment-group-summary {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto 24px;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 76px;
+  padding: 10px 11px;
+  border: 0;
+  background: transparent;
+  color: #f4f7fb;
+  text-align: left;
+}
+
+.treatments-manager-modal .treatment-group-summary > span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.treatments-manager-modal .treatment-group-summary small {
+  overflow: hidden;
+  color: #a5b0c3;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treatments-manager-modal .treatment-group-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(45, 212, 159, .13);
+  color: #2dd49f;
+  font-size: 20px;
+}
+
+.treatments-manager-modal .treatment-status {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(45, 212, 159, .12);
+  color: #55deb3;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.treatments-manager-modal .treatment-status[data-status='paused'] {
+  background: rgba(245, 158, 11, .13);
+  color: #fbbf24;
+}
+
+.treatments-manager-modal .treatment-status[data-status='finished'] {
+  background: rgba(148, 163, 184, .13);
+  color: #b7c1cf;
+}
+
+.treatments-manager-modal .treatment-group-summary > ion-icon {
+  color: #a5b0c3;
+  transition: transform 180ms ease;
+}
+
+.treatments-manager-modal .treatment-group.expanded .treatment-group-summary > ion-icon {
+  transform: rotate(180deg);
+}
+
+.treatments-manager-modal .treatment-group-detail {
+  display: grid;
+  gap: 14px;
+  padding: 14px 12px;
+  border-top: 1px solid #303b4c;
+  animation: home-task-actions-in 180ms ease-out;
+}
+
+.treatments-manager-modal .treatment-today-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid #303b4c;
+  border-radius: 8px;
+}
+
+.treatments-manager-modal .treatment-today-stats button {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: #9fabbc;
+  font-size: 10px;
+}
+
+.treatments-manager-modal .treatment-today-stats button + button {
+  border-left: 1px solid #303b4c;
+}
+
+.treatments-manager-modal .treatment-today-stats strong {
+  color: #f4f7fb;
+  font-size: 17px;
+}
+
+.treatments-manager-modal .treatment-today-stats .alert,
+.treatments-manager-modal .treatment-today-stats .alert strong {
+  color: #ff657c;
+}
+
+.treatments-manager-modal .managed-medication-list {
+  display: grid;
+}
+
+.treatments-manager-modal .managed-medication {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 66px;
+  border-bottom: 1px solid #273140;
+}
+
+.treatments-manager-modal .managed-medication > span {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 3px 9px;
+  align-items: center;
+  min-width: 0;
+}
+
+.treatments-manager-modal .managed-medication i {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--treatment-color);
+}
+
+.treatments-manager-modal .managed-medication > span > strong,
+.treatments-manager-modal .managed-medication > span > small {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treatments-manager-modal .managed-medication small {
+  color: #a5b0c3;
+  font-size: 11px;
+}
+
+.treatments-manager-modal .managed-medication .managed-stock.low {
+  color: #ff7588;
+  font-weight: 600;
+}
+
+.treatments-manager-modal .managed-medication-actions {
+  display: flex;
+}
+
+.treatments-manager-modal .managed-medication button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: #72a7ff;
+  font-size: 19px;
+}
+
+.treatments-manager-modal .medication-restock-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px auto auto;
+  gap: 7px;
+  align-items: center;
+  padding: 9px;
+  border: 1px solid #3b4a60;
+  border-radius: 7px;
+  background: #0d141f;
+  color: #cbd4e1;
+  font-size: 11px;
+}
+
+.treatments-manager-modal .medication-restock-editor ion-input {
+  --background: #080d14;
+  --padding-start: 9px;
+  min-height: 40px;
+  border: 1px solid #3b4a60;
+  border-radius: 6px;
+}
+
+.treatments-manager-modal .medication-restock-editor button {
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid #3b4a60;
+  border-radius: 6px;
+  background: #151e2b;
+  color: #cbd4e1;
+}
+
+.treatments-manager-modal .medication-restock-editor .confirm {
+  border-color: #2f6ec5;
+  color: #72a7ff;
+}
+
+.treatments-manager-modal .medication-restock-editor button:disabled {
+  opacity: .4;
+}
+
+.treatments-manager-modal .view-treatment-history {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid #3b4a60;
+  border-radius: 7px;
+  background: #111a26;
+  color: #72a7ff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.treatments-manager-modal .treatment-group-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.treatments-manager-modal .treatment-group-actions button {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-height: 54px;
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: #192231;
+  color: #72a7ff;
+  font-size: 11px;
+}
+
+.treatments-manager-modal .treatment-group-actions ion-icon {
+  font-size: 20px;
+}
+
+.treatments-manager-modal .treatment-group-actions .danger,
+.treatments-manager-modal .treatment-delete-confirmation .danger {
+  color: #ff657c;
+}
+
+.treatments-manager-modal .treatment-delete-confirmation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #773044;
+  border-radius: 8px;
+  background: #28151c;
+  color: #f4f7fb;
+  font-size: 12px;
+}
+
+.treatments-manager-modal .treatment-delete-confirmation button {
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid #485568;
+  border-radius: 6px;
+  background: #151c27;
+  color: #dce3ed;
+}
+
+.treatments-manager-modal .treatments-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 64px 18px;
+  color: #a5b0c3;
+  text-align: center;
+}
+
+.treatments-manager-modal .treatments-empty ion-icon {
+  color: #2dd49f;
+  font-size: 38px;
+}
+
+.treatments-manager-modal .treatments-empty strong {
+  color: #f4f7fb;
+}
+
+.treatments-manager-modal .medication-history {
+  display: grid;
+  gap: 14px;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 14px 12px 28px;
+}
+
+.treatments-manager-modal .medication-history-heading {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 11px;
+  align-items: center;
+}
+
+.treatments-manager-modal .medication-history-heading > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.treatments-manager-modal .medication-history-heading small {
+  color: #a5b0c3;
+  font-size: 11px;
+}
+
+.treatments-manager-modal .medication-history-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 3px;
+  border: 1px solid #303b4c;
+  border-radius: 8px;
+  background: #111722;
+}
+
+.treatments-manager-modal .medication-history-filters button {
+  min-height: 38px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #a5b0c3;
+  font-size: 11px;
+}
+
+.treatments-manager-modal .medication-history-filters button.active {
+  border-bottom-color: #5595ff;
+  color: #72a7ff;
+}
+
+.treatments-manager-modal .medication-history-list {
+  display: grid;
+  gap: 7px;
+}
+
+.treatments-manager-modal .medication-history-entry {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 62px;
+  padding: 9px 10px;
+  border: 1px solid #303b4c;
+  border-left: 3px solid #2dd49f;
+  border-radius: 7px;
+  background: #121923;
+}
+
+.treatments-manager-modal .history-date,
+.treatments-manager-modal .history-medication {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.treatments-manager-modal .history-date strong {
+  text-transform: capitalize;
+}
+
+.treatments-manager-modal .history-date small,
+.treatments-manager-modal .history-medication small {
+  overflow: hidden;
+  color: #9fabbc;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.treatments-manager-modal .history-result {
+  min-width: 54px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: rgba(45, 212, 159, .12);
+  color: #55deb3;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.treatments-manager-modal .medication-history-entry[data-status='late'],
+.treatments-manager-modal .medication-history-entry[data-status='pending'] {
+  border-left-color: #f59e0b;
+}
+
+.treatments-manager-modal .medication-history-entry[data-status='late'] .history-result,
+.treatments-manager-modal .medication-history-entry[data-status='pending'] .history-result {
+  background: rgba(245, 158, 11, .13);
+  color: #fbbf24;
+}
+
+.treatments-manager-modal .medication-history-entry[data-status='missed'],
+.treatments-manager-modal .medication-history-entry[data-status='overdue'] {
+  border-left-color: #ff4d67;
+}
+
+.treatments-manager-modal .medication-history-entry[data-status='missed'] .history-result,
+.treatments-manager-modal .medication-history-entry[data-status='overdue'] .history-result {
+  background: rgba(255, 77, 103, .13);
+  color: #ff7588;
+}
+
+.treatments-manager-modal .history-empty {
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  padding: 48px 16px;
+  color: #9fabbc;
+  font-size: 12px;
+}
+
+.treatments-manager-modal .history-empty strong {
+  color: #f4f7fb;
+  font-size: 15px;
+}
+
 @media (max-width: 380px) {
-  ion-modal.settings-reminder-modal { --width: calc(100% - 16px); --height: calc(100dvh - 16px); --border-radius: 10px; }
+  .settings-side-menu .settings-side-nav > button { grid-template-columns: 40px minmax(0, 1fr) 18px; }
+  .settings-side-menu .settings-side-state { display: none; }
+  .global-search-modal .global-search-results > button { grid-template-columns: 40px minmax(0, 1fr) 18px; }
+  .global-search-modal .global-search-kind { display: none; }
+  ion-modal.settings-reminder-modal { --width: calc(100% - 24px); --height: calc(100dvh - 64px); --border-radius: 10px; }
+  ion-modal.wellness-modal { --height: calc(100dvh - 64px); }
+  ion-modal.treatments-manager-modal { --height: calc(100dvh - 64px); }
   .settings-reminder-modal .reminder-lead-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-reminder-modal .reminder-label-summary { padding-right: 8px; }
+  .wellness-modal .medication-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .wellness-modal .medication-quick-field > span { font-size: 12px; }
+  .wellness-modal .medication-quick-field ion-select { --padding-start: 10px; --padding-end: 6px; }
+  .wellness-modal .medication-stock-editor { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .wellness-modal .first-dose-field { max-width: none; }
+  .wellness-modal .treatment-calculation { grid-template-columns: 44px minmax(0, 1fr); }
+  .wellness-modal .calculation-icon { width: 44px; height: 44px; }
+  .wellness-modal .calculation-total { grid-column: 2; text-align: left; }
+  .treatments-manager-modal .medication-restock-editor { grid-template-columns: minmax(0, 1fr) 92px; }
+  .treatments-manager-modal .medication-restock-editor button { grid-row: 2; }
 }

@@ -1,4 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { Subject } from 'rxjs';
+import { AgendaStorageService } from './agenda-storage.service';
 import {
   EventPreset,
   RecurrenceScope,
@@ -10,6 +12,7 @@ import {
   TaskSection,
   TaskStatus,
   TaskSummary,
+  TaskSubtask,
   TaskType,
 } from './task.model';
 
@@ -26,12 +29,14 @@ interface TaskDraft {
   favorita?: boolean;
   repeticion?: TaskRepeat;
   parentId?: number;
+  subtasks?: TaskSubtask[];
 }
 
 @Injectable({
   providedIn: 'root',
 })
 export class TaskService {
+  private readonly agendaStorage = inject(AgendaStorageService);
   private readonly storageKey = 'tareas';
   private readonly presetsStorageKey = 'eventos-preestablecidos';
 
@@ -44,6 +49,8 @@ export class TaskService {
   ];
 
   private tareas: Task[] = [];
+  private readonly changesSubject = new Subject<Task[]>();
+  readonly changes$ = this.changesSubject.asObservable();
 
   load(): Task[] {
     const datos = localStorage.getItem(this.storageKey);
@@ -65,8 +72,27 @@ export class TaskService {
     return this.getAll();
   }
 
+  async initializePersistence(): Promise<{ tasks: Task[]; presets: EventPreset[] }> {
+    const localPresets = this.loadEventPresets();
+    try {
+      const stored = await this.agendaStorage.initialize(this.tareas, localPresets);
+      this.tareas = stored.tasks.map((task) => this.normalizeTask(task));
+      this.refreshExpired();
+      const presets = this.normalizePresets(stored.presets);
+      localStorage.setItem(this.presetsStorageKey, JSON.stringify(presets));
+      this.save();
+      return { tasks: this.getAll(), presets };
+    } catch (error) {
+      console.error('No fue posible inicializar SQLite; se conserva el respaldo local.', error);
+      return { tasks: this.getAll(), presets: localPresets };
+    }
+  }
+
   getAll(): Task[] {
-    return this.tareas.map((tarea) => ({ ...tarea }));
+    return this.tareas.map((tarea) => ({
+      ...tarea,
+      subtasks: tarea.subtasks?.map((subtask) => ({ ...subtask })),
+    }));
   }
 
   loadEventPresets(): EventPreset[] {
@@ -74,22 +100,7 @@ export class TaskService {
     if (!stored) return [];
 
     try {
-      const parsed = JSON.parse(stored) as Partial<EventPreset>[];
-      return parsed.filter((preset) => typeof preset.nombre === 'string').map((preset) => ({
-        id: typeof preset.id === 'number' ? preset.id : Date.now(),
-        nombre: preset.nombre?.trim() || 'Evento',
-        color: typeof preset.color === 'string' ? preset.color : '#2563eb',
-        horaInicio: typeof preset.horaInicio === 'string' ? preset.horaInicio : '09:00',
-        horaFin: typeof preset.horaFin === 'string' ? preset.horaFin : '10:00',
-        dias: Array.isArray(preset.dias) ? preset.dias.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : [],
-          horarios: Array.isArray(preset.horarios)
-            ? preset.horarios.filter((schedule) =>
-                typeof schedule?.dia === 'number' &&
-                typeof schedule.horaInicio === 'string' &&
-                typeof schedule.horaFin === 'string',
-              )
-            : [],
-      }));
+      return this.normalizePresets(JSON.parse(stored) as Partial<EventPreset>[]);
     } catch {
       return [];
     }
@@ -99,6 +110,7 @@ export class TaskService {
     const presets = this.loadEventPresets();
     const next = [...presets, { ...preset, id: Date.now() }];
     localStorage.setItem(this.presetsStorageKey, JSON.stringify(next));
+    void this.agendaStorage.savePresets(next);
     return next;
   }
 
@@ -107,6 +119,7 @@ export class TaskService {
       item.id === preset.id ? preset : item,
     );
     localStorage.setItem(this.presetsStorageKey, JSON.stringify(next));
+    void this.agendaStorage.savePresets(next);
 
     this.tareas = this.tareas.flatMap((tarea) => {
       const matchesPreset =
@@ -253,9 +266,10 @@ export class TaskService {
         etiqueta: draft.etiqueta,
         favorita: draft.favorita ?? false,
         repeticion: repetition,
-        seriesId: draft.tipo === 'evento' && repetition !== 'none' ? `serie-${id}` : undefined,
+        seriesId: repetition !== 'none' ? `serie-${id}` : undefined,
         occurrenceDate: this.cleanOptional(draft.fecha),
         parentId: typeof draft.parentId === 'number' ? draft.parentId : undefined,
+        subtasks: this.normalizeSubtasks(draft.subtasks),
       },
     ];
     this.save();
@@ -270,9 +284,10 @@ export class TaskService {
       return this.getAll();
     }
 
-    this.tareas = this.tareas.map((tarea) =>
-      tarea.id === id
-        ? {
+    this.tareas = this.tareas.map((tarea) => {
+      if (tarea.id !== id) return tarea;
+      const repetition = draft.repeticion ?? 'none';
+      return {
             ...tarea,
             titulo,
             tipo: draft.tipo ?? tarea.tipo,
@@ -284,11 +299,14 @@ export class TaskService {
             prioridad: draft.prioridad,
             etiqueta: draft.etiqueta,
             favorita: draft.favorita ?? false,
-            repeticion: draft.repeticion ?? 'none',
+            repeticion: repetition,
+            seriesId: repetition !== 'none' ? tarea.seriesId ?? `serie-${id}` : undefined,
+            occurrenceDate: this.cleanOptional(draft.fecha),
+            recurrenceExceptions: repetition !== 'none' ? tarea.recurrenceExceptions : undefined,
             parentId: typeof draft.parentId === 'number' ? draft.parentId : undefined,
-          }
-        : tarea,
-    );
+            subtasks: this.normalizeSubtasks(draft.subtasks),
+          };
+    });
     this.save();
 
     return this.getAll();
@@ -369,18 +387,53 @@ export class TaskService {
   }
 
   toggleCompleted(id: number): Task[] {
+    let completedTask: Task | undefined;
     this.tareas = this.tareas.map((tarea) => {
       if (tarea.id !== id) {
         return tarea;
       }
 
-      return {
+      const updated: Task = {
         ...tarea,
         estado: tarea.estado === 'completada' ? 'pendiente' : 'completada',
       };
+      if (updated.estado === 'completada') completedTask = updated;
+      return updated;
     });
+    if (completedTask) this.ensureNextTaskOccurrence(completedTask);
     this.save();
 
+    return this.getAll();
+  }
+
+  complete(id: number): Task[] {
+    let completedTask: Task | undefined;
+    this.tareas = this.tareas.map((tarea) => {
+      if (tarea.id !== id) return tarea;
+      const updated: Task = { ...tarea, estado: 'completada' };
+      completedTask = updated;
+      return updated;
+    });
+    if (completedTask) this.ensureNextTaskOccurrence(completedTask);
+    this.save();
+    return this.getAll();
+  }
+
+  findById(id: number): Task | undefined {
+    const task = this.tareas.find((item) => item.id === id);
+    return task ? { ...task, subtasks: task.subtasks?.map((subtask) => ({ ...subtask })) } : undefined;
+  }
+
+  toggleSubtask(taskId: number, subtaskId: string): Task[] {
+    this.tareas = this.tareas.map((task) => task.id === taskId
+      ? {
+          ...task,
+          subtasks: task.subtasks?.map((subtask) => subtask.id === subtaskId
+            ? { ...subtask, completed: !subtask.completed }
+            : subtask),
+        }
+      : task);
+    this.save();
     return this.getAll();
   }
 
@@ -393,18 +446,26 @@ export class TaskService {
     return this.getAll();
   }
 
-  reschedule(id: number, fecha?: string, hora?: string): Task[] {
-    this.tareas = this.tareas.map((tarea) =>
-      tarea.id === id
-        ? {
-            ...tarea,
-            fecha: this.cleanOptional(fecha),
-            hora: this.cleanOptional(hora),
-          horaFin: hora ? this.addMinutes(hora, tarea.duracion ?? 60) : tarea.horaFin,
-            estado: 'pendiente',
-          }
-        : tarea,
-    );
+  reschedule(id: number, fecha?: string, hora?: string, horaFin?: string): Task[] {
+    const cleanStart = this.cleanOptional(hora);
+    const requestedEnd = this.cleanOptional(horaFin);
+
+    this.tareas = this.tareas.map((tarea) => {
+      if (tarea.id !== id) return tarea;
+
+      const end = cleanStart
+        ? requestedEnd ?? this.addMinutes(cleanStart, tarea.duracion ?? 60)
+        : undefined;
+
+      return {
+        ...tarea,
+        fecha: this.cleanOptional(fecha),
+        hora: cleanStart,
+        horaFin: end,
+        duracion: this.durationFromTimes(cleanStart, end, tarea.duracion),
+        estado: 'pendiente',
+      };
+    });
     this.save();
 
     return this.getAll();
@@ -511,7 +572,7 @@ export class TaskService {
     return tareas.some(
       (tarea) =>
         tarea.fecha === fecha &&
-        tarea.estado === 'pendiente',
+        tarea.estado !== 'ignorada',
     );
   }
 
@@ -617,7 +678,10 @@ export class TaskService {
   }
 
   private save(): void {
+    this.tareas = this.applySyncMetadata(this.tareas);
     localStorage.setItem(this.storageKey, JSON.stringify(this.tareas));
+    void this.agendaStorage.saveTasks(this.tareas);
+    this.changesSubject.next(this.getAll());
   }
 
   private createSeedTasks(): Task[] {
@@ -682,27 +746,112 @@ export class TaskService {
     ];
   }
 
-  private refreshExpired(): void {
-    const now = Date.now();
+  refreshExpired(reference = new Date()): Task[] {
+    const now = reference.getTime();
+    let changed = false;
+    const expiredTasks: Task[] = [];
 
     this.tareas = this.tareas.map((tarea) => {
-      if (tarea.estado !== 'pendiente' || !tarea.fecha || !tarea.hora) {
+      if (
+        tarea.tipo !== 'tarea' ||
+        tarea.estado !== 'pendiente' ||
+        !tarea.fecha
+      ) {
         return tarea;
       }
 
-      const taskTime = new Date(`${tarea.fecha}T${tarea.hora}`).getTime();
-      const expiredAt = taskTime + 3600000;
+      let expiredAt: number;
+      if (!tarea.hora) {
+        expiredAt = new Date(`${this.addDays(tarea.fecha, 1)}T00:00:00`).getTime();
+      } else {
+        const start = new Date(`${tarea.fecha}T${tarea.hora}:00`);
+        if (tarea.horaFin) {
+          const end = new Date(`${tarea.fecha}T${tarea.horaFin}:00`);
+          if (end.getTime() <= start.getTime()) end.setDate(end.getDate() + 1);
+          expiredAt = end.getTime();
+        } else {
+          expiredAt = start.getTime() + this.normalizeDuration(tarea.duracion) * 60_000;
+        }
+      }
 
-      return now >= expiredAt ? { ...tarea, estado: 'vencida' } : tarea;
+      if (now < expiredAt) return tarea;
+
+      changed = true;
+      const expired: Task = { ...tarea, estado: 'vencida' };
+      expiredTasks.push(expired);
+      return expired;
     });
+
+    if (changed) {
+      expiredTasks.forEach((task) => this.ensureNextTaskOccurrence(task));
+      this.save();
+    }
+    return this.getAll();
+  }
+
+  private ensureNextTaskOccurrence(task: Task): void {
+    const repetition = task.repeticion ?? 'none';
+    if (task.tipo !== 'tarea' || repetition === 'none' || !task.fecha) return;
+
+    const seriesId = task.seriesId ?? `serie-${task.id}`;
+    const nextDate = this.nextRecurrenceDate(task.fecha, repetition);
+    if (
+      this.tareas.some((candidate) =>
+        candidate.id !== task.id &&
+        candidate.seriesId === seriesId &&
+        candidate.fecha === nextDate,
+      )
+    ) {
+      return;
+    }
+
+    let id = Date.now();
+    while (this.tareas.some((candidate) => candidate.id === id)) id += 1;
+    const now = new Date().toISOString();
+    this.tareas = [
+      ...this.tareas,
+      {
+        ...task,
+        id,
+        uuid: this.createUuid(),
+        fecha: nextDate,
+        estado: 'pendiente',
+        seriesId,
+        occurrenceDate: nextDate,
+        parentId: undefined,
+        subtasks: task.subtasks?.map((subtask) => ({ ...subtask, completed: false })),
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+        syncStatus: 'pending',
+      },
+    ];
+  }
+
+  private nextRecurrenceDate(fecha: string, repetition: Exclude<TaskRepeat, 'none'>): string {
+    if (repetition === 'daily') return this.addDays(fecha, 1);
+    if (repetition === 'weekly') return this.addDays(fecha, 7);
+
+    const source = new Date(`${fecha}T00:00:00`);
+    const day = source.getDate();
+    const nextMonth = new Date(source.getFullYear(), source.getMonth() + 1, 1);
+    const lastDay = new Date(
+      nextMonth.getFullYear(),
+      nextMonth.getMonth() + 1,
+      0,
+    ).getDate();
+    nextMonth.setDate(Math.min(day, lastDay));
+    return this.toISODate(nextMonth);
   }
 
   private normalizeTask(task: Partial<Task>): Task {
     const id = typeof task.id === 'number' ? task.id : Date.now();
+    const now = new Date().toISOString();
     const tipo = task.tipo === 'evento' ? 'evento' : 'tarea';
     const repeticion = task.repeticion ?? 'none';
     return {
       id,
+      uuid: typeof task.uuid === 'string' && task.uuid ? task.uuid : this.createUuid(),
       titulo: typeof task.titulo === 'string' ? task.titulo : 'Tarea sin titulo',
       tipo,
       fecha: this.cleanOptional(task.fecha),
@@ -718,7 +867,7 @@ export class TaskService {
       repeticion,
       seriesId: typeof task.seriesId === 'string'
         ? task.seriesId
-        : tipo === 'evento' && repeticion !== 'none' ? `serie-${id}` : undefined,
+        : repeticion !== 'none' ? `serie-${id}` : undefined,
       occurrenceDate: this.cleanOptional(task.occurrenceDate),
       recurrenceExceptions: Array.isArray(task.recurrenceExceptions)
         ? task.recurrenceExceptions.filter((date) => typeof date === 'string')
@@ -726,7 +875,88 @@ export class TaskService {
       parentId: typeof task.parentId === 'number' && task.parentId !== id
         ? task.parentId
         : undefined,
+      subtasks: tipo === 'tarea' ? this.normalizeSubtasks(task.subtasks) : undefined,
+      createdAt: typeof task.createdAt === 'string' ? task.createdAt : now,
+      updatedAt: typeof task.updatedAt === 'string' ? task.updatedAt : now,
+      version: typeof task.version === 'number' && task.version > 0 ? task.version : 1,
+      syncStatus: task.syncStatus === 'synced' || task.syncStatus === 'conflict'
+        ? task.syncStatus
+        : 'pending',
     };
+  }
+
+  private normalizeSubtasks(subtasks?: TaskSubtask[]): TaskSubtask[] | undefined {
+    if (!Array.isArray(subtasks)) return undefined;
+    const ids = new Set<string>();
+    const normalized = subtasks
+      .filter((subtask) => subtask && typeof subtask.title === 'string' && !!subtask.title.trim())
+      .map((subtask) => {
+        let id = typeof subtask.id === 'string' && subtask.id ? subtask.id : this.createUuid();
+        while (ids.has(id)) id = this.createUuid();
+        ids.add(id);
+        return { id, title: subtask.title.trim(), completed: subtask.completed === true };
+      });
+    return normalized.length ? normalized : undefined;
+  }
+
+  private normalizePresets(presets: Partial<EventPreset>[]): EventPreset[] {
+    return presets.filter((preset) => typeof preset.nombre === 'string').map((preset) => ({
+      id: typeof preset.id === 'number' ? preset.id : Date.now(),
+      nombre: preset.nombre?.trim() || 'Evento',
+      color: typeof preset.color === 'string' ? preset.color : '#2563eb',
+      horaInicio: typeof preset.horaInicio === 'string' ? preset.horaInicio : '09:00',
+      horaFin: typeof preset.horaFin === 'string' ? preset.horaFin : '10:00',
+      dias: Array.isArray(preset.dias)
+        ? preset.dias.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+        : [],
+      horarios: Array.isArray(preset.horarios)
+        ? preset.horarios.filter((schedule) =>
+            typeof schedule?.dia === 'number' &&
+            typeof schedule.horaInicio === 'string' &&
+            typeof schedule.horaFin === 'string',
+          )
+        : [],
+    }));
+  }
+
+  private applySyncMetadata(tasks: Task[]): Task[] {
+    const previous = new Map<number, Partial<Task>>();
+    try {
+      const stored = JSON.parse(localStorage.getItem(this.storageKey) ?? '[]') as Partial<Task>[];
+      stored.forEach((task) => {
+        if (typeof task.id === 'number') previous.set(task.id, task);
+      });
+    } catch {
+      // A damaged backup must not prevent SQLite from receiving current data.
+    }
+
+    const now = new Date().toISOString();
+    return tasks.map((task) => {
+      const current = this.normalizeTask(task);
+      const old = previous.get(task.id);
+      if (!old) return current;
+      const changed = this.taskPayload(current) !== this.taskPayload(old);
+      return {
+        ...current,
+        uuid: typeof old.uuid === 'string' && old.uuid ? old.uuid : current.uuid,
+        createdAt: typeof old.createdAt === 'string' ? old.createdAt : current.createdAt,
+        updatedAt: changed ? now : current.updatedAt,
+        version: changed ? Math.max(current.version ?? 1, old.version ?? 1) + 1 : current.version,
+        syncStatus: changed ? 'pending' : current.syncStatus,
+      };
+    });
+  }
+
+  private taskPayload(task: Partial<Task>): string {
+    const { uuid: _uuid, createdAt: _createdAt, updatedAt: _updatedAt, version: _version, syncStatus: _syncStatus, ...payload } = task;
+    return JSON.stringify(payload);
+  }
+
+  private createUuid(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return `task-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
   private normalizePriority(priority?: TaskPriority): TaskPriority {
