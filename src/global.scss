@@ -1628,13 +1628,13 @@ ion-modal.quick-notes-modal {
 
 ion-modal.settings-reminder-modal {
   --width: min(620px, calc(100% - 24px));
-  --height: min(720px, calc(100dvh - 64px));
+  --height: min(700px, calc(100dvh - 120px));
   --border-radius: 12px;
   --background: #10131a;
 }
 
 ion-modal.settings-reminder-modal.wallet-modal {
-  --height: min(720px, calc(100dvh - 64px));
+  --height: min(700px, calc(100dvh - 120px));
 }
 
 ion-modal.settings-reminder-modal::part(content) {
@@ -1647,11 +1647,11 @@ ion-modal.settings-reminder-modal ion-content {
 }
 
 ion-modal.wellness-modal {
-  --height: min(720px, calc(100dvh - 64px));
+  --height: min(700px, calc(100dvh - 120px));
 }
 
 ion-modal.treatments-manager-modal {
-  --height: min(720px, calc(100dvh - 64px));
+  --height: min(700px, calc(100dvh - 120px));
 }
 
 ion-modal.wellness-modal ion-content,
@@ -2590,9 +2590,9 @@ ion-modal.treatments-manager-modal ion-content {
   .settings-side-menu .settings-side-state { display: none; }
   .global-search-modal .global-search-results > button { grid-template-columns: 40px minmax(0, 1fr) 18px; }
   .global-search-modal .global-search-kind { display: none; }
-  ion-modal.settings-reminder-modal { --width: calc(100% - 24px); --height: calc(100dvh - 64px); --border-radius: 10px; }
-  ion-modal.wellness-modal { --height: calc(100dvh - 64px); }
-  ion-modal.treatments-manager-modal { --height: calc(100dvh - 64px); }
+  ion-modal.settings-reminder-modal { --width: calc(100% - 24px); --height: calc(100dvh - 120px); --border-radius: 10px; }
+  ion-modal.wellness-modal { --height: calc(100dvh - 120px); }
+  ion-modal.treatments-manager-modal { --height: calc(100dvh - 120px); }
   .settings-reminder-modal .reminder-lead-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-reminder-modal .reminder-label-summary { padding-right: 8px; }
   .wellness-modal .medication-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
