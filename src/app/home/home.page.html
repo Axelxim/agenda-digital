@@ -1126,7 +1126,7 @@
           <div class="wallet-section"><div class="wallet-section-title"><h2>Gastos fijos</h2><span>{{ walletState.fixedExpenses.length }}</span></div>
             @if (walletState.fixedExpenses.length === 0) { <p class="wallet-empty">No hay gastos fijos registrados.</p> }
             @for (expense of walletState.fixedExpenses; track expense.id) {
-            <button type="button" class="wallet-fixed-row" (click)="nuevoGastoFijo(expense)"><span><strong>{{ expense.name }}</strong><small>Día {{ expense.dueDay }} · {{ expense.frequencyMonths === 2 ? 'Bimestral' : 'Mensual' }} · {{ expense.category }}</small></span><b>{{ walletMoney(expense.amount) }}</b><ion-icon name="pencil-outline"></ion-icon></button>
+            <button type="button" class="wallet-fixed-row" (click)="nuevoGastoFijo(expense)"><span><strong>{{ expense.name }}</strong><small>{{ expense.frequencyMonths === 2 ? ('Cada 2 meses desde ' + formatDate(expense.firstDueDate)) : ('Día ' + expense.dueDay + ' · Mensual') }} · {{ expense.category }}</small></span><b>{{ walletMoney(expense.amount) }}</b><ion-icon name="pencil-outline"></ion-icon></button>
             }
           </div>
 
@@ -1166,8 +1166,15 @@
             <ion-select label="Categoría" label-placement="stacked" [(ngModel)]="fixedExpenseCategory">@for (category of walletCategories; track category) { <ion-select-option [value]="category">{{ category }}</ion-select-option> }</ion-select>
             <ion-select label="Frecuencia" label-placement="stacked" [(ngModel)]="fixedExpenseFrequencyMonths"><ion-select-option [value]="1">Mensual</ion-select-option><ion-select-option [value]="2">Bimestral</ion-select-option></ion-select>
           </div>
-          <div class="wallet-form-row"><ion-input label="Día de vencimiento" label-placement="stacked" type="number" min="1" max="31" [(ngModel)]="fixedExpenseDueDay"></ion-input><ion-input label="Hora del aviso" label-placement="stacked" type="time" [(ngModel)]="fixedExpenseReminderTime"></ion-input></div>
-          <button type="button" class="wallet-primary" [disabled]="!fixedExpenseName.trim() || !fixedExpenseAmount || fixedExpenseAmount <= 0" (click)="guardarGastoFijo()">Guardar gasto fijo</button>
+          <div class="wallet-form-row">
+            @if (fixedExpenseFrequencyMonths === 2) {
+            <ion-input label="Primer vencimiento" label-placement="stacked" type="date" [(ngModel)]="fixedExpenseFirstDueDate"></ion-input>
+            } @else {
+            <ion-input label="Día de vencimiento" label-placement="stacked" type="number" min="1" max="31" [(ngModel)]="fixedExpenseDueDay"></ion-input>
+            }
+            <ion-input label="Hora del aviso" label-placement="stacked" type="time" [(ngModel)]="fixedExpenseReminderTime"></ion-input>
+          </div>
+          <button type="button" class="wallet-primary" [disabled]="!fixedExpenseName.trim() || !fixedExpenseAmount || fixedExpenseAmount <= 0 || (fixedExpenseFrequencyMonths === 2 && !fixedExpenseFirstDueDate)" (click)="guardarGastoFijo()">Guardar gasto fijo</button>
           @if (editingFixedExpenseId) { <button type="button" class="wallet-danger" (click)="eliminarGastoFijo(editingFixedExpenseId)">Eliminar gasto fijo</button> }
         </section>
         }

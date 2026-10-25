@@ -328,6 +328,7 @@ export class HomePage implements OnInit, OnDestroy {
   fixedExpenseCategory = 'Servicios';
   fixedExpenseDueDay = 1;
   fixedExpenseFrequencyMonths: 1 | 2 = 1;
+  fixedExpenseFirstDueDate = '';
   fixedExpenseReminderTime = '09:00';
   payingFixedOccurrence: FixedExpenseOccurrence | null = null;
   fixedPaymentAmount: number | null = null;
@@ -1932,6 +1933,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.fixedExpenseCategory = expense?.category ?? 'Servicios';
     this.fixedExpenseDueDay = expense?.dueDay ?? 1;
     this.fixedExpenseFrequencyMonths = expense?.frequencyMonths ?? 1;
+    this.fixedExpenseFirstDueDate = expense?.firstDueDate ?? this.taskService.toISODate(this.currentTime);
     this.fixedExpenseReminderTime = expense?.reminderTime ?? '09:00';
     this.walletView = 'fixed';
   }
@@ -1944,6 +1946,7 @@ export class HomePage implements OnInit, OnDestroy {
       category: this.fixedExpenseCategory,
       dueDay: this.fixedExpenseDueDay,
       frequencyMonths: this.fixedExpenseFrequencyMonths,
+      firstDueDate: this.fixedExpenseFirstDueDate,
       reminderTime: this.fixedExpenseReminderTime,
       active: true,
     }, this.editingFixedExpenseId ?? undefined);

@@ -17,6 +17,7 @@ export interface FixedExpense {
   category: string;
   dueDay: number;
   frequencyMonths: FixedExpenseFrequency;
+  firstDueDate: string;
   trackingStartDate: string;
   reminderTime: string;
   active: boolean;

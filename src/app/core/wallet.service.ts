@@ -57,18 +57,30 @@ export class WalletService {
     return this.getState();
   }
 
-  saveFixedExpense(draft: Omit<FixedExpense, 'id' | 'createdAt' | 'updatedAt' | 'trackingStartDate'>, id?: string): WalletState {
+  saveFixedExpense(
+    draft: Omit<FixedExpense, 'id' | 'createdAt' | 'updatedAt' | 'trackingStartDate' | 'firstDueDate'> & { firstDueDate?: string },
+    id?: string,
+  ): WalletState {
     const current = new Date();
     const now = current.toISOString();
     const existing = id ? this.state.fixedExpenses.find((item) => item.id === id) : undefined;
+    const frequencyMonths = draft.frequencyMonths === 2 ? 2 : 1;
+    const trackingStartDate = existing?.trackingStartDate || this.payPeriod(current).start;
+    const requestedFirstDueDate = this.validDate(draft.firstDueDate)
+      ? draft.firstDueDate!
+      : existing?.firstDueDate;
+    const firstDueDate = requestedFirstDueDate || this.dateWithDay(trackingStartDate, draft.dueDay);
     const expense: FixedExpense = {
       id: existing?.id ?? this.createId(),
       name: draft.name.trim(),
       amount: this.amount(draft.amount),
       category: draft.category || 'Otros',
-      dueDay: Math.min(31, Math.max(1, Math.round(Number(draft.dueDay) || 1))),
-      frequencyMonths: draft.frequencyMonths === 2 ? 2 : 1,
-      trackingStartDate: existing?.trackingStartDate || this.payPeriod(current).start,
+      dueDay: frequencyMonths === 2
+        ? Number(firstDueDate.slice(8, 10))
+        : Math.min(31, Math.max(1, Math.round(Number(draft.dueDay) || 1))),
+      frequencyMonths,
+      firstDueDate,
+      trackingStartDate,
       reminderTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(draft.reminderTime) ? draft.reminderTime : '09:00',
       active: draft.active !== false,
       createdAt: existing?.createdAt ?? now,
@@ -151,11 +163,15 @@ export class WalletService {
       const period = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
       const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
       for (const expense of this.state.fixedExpenses.filter((item) => item.active)) {
-        const trackingStart = new Date(`${expense.trackingStartDate}T12:00:00`);
-        const elapsedMonths = (month.getFullYear() - trackingStart.getFullYear()) * 12 + month.getMonth() - trackingStart.getMonth();
+        const recurrenceStartDate = expense.frequencyMonths === 2
+          ? expense.firstDueDate
+          : expense.trackingStartDate;
+        const recurrenceStart = new Date(`${recurrenceStartDate}T12:00:00`);
+        const elapsedMonths = (month.getFullYear() - recurrenceStart.getFullYear()) * 12 + month.getMonth() - recurrenceStart.getMonth();
         if (elapsedMonths < 0 || elapsedMonths % expense.frequencyMonths !== 0) continue;
         const dueDate = `${period}-${String(Math.min(expense.dueDay, lastDay)).padStart(2, '0')}`;
-        if (dueDate < expense.trackingStartDate) continue;
+        const activeFrom = expense.frequencyMonths === 2 ? expense.firstDueDate : expense.trackingStartDate;
+        if (dueDate < activeFrom) continue;
         const paidTransaction = this.state.transactions.find((item) =>
           item.type === 'fixed-expense' && item.fixedExpenseId === expense.id && item.fixedPeriod === period);
         result.push({
@@ -251,14 +267,19 @@ export class WalletService {
   private normalizeFixedExpense(value: Partial<FixedExpense>, settings: WalletSettings): FixedExpense {
     const now = new Date().toISOString();
     const createdAt = value.createdAt || now;
+    const trackingStartDate = value.trackingStartDate || this.payPeriod(new Date(createdAt), settings).start;
+    const dueDay = Math.min(31, Math.max(1, Math.round(Number(value.dueDay) || 1)));
     return {
       id: value.id || this.createId(),
       name: value.name?.trim() || '',
       amount: this.amount(value.amount),
       category: value.category || 'Otros',
-      dueDay: Math.min(31, Math.max(1, Math.round(Number(value.dueDay) || 1))),
+      dueDay,
       frequencyMonths: value.frequencyMonths === 2 ? 2 : 1,
-      trackingStartDate: value.trackingStartDate || this.payPeriod(new Date(createdAt), settings).start,
+      firstDueDate: this.validDate(value.firstDueDate)
+        ? value.firstDueDate!
+        : this.dateWithDay(trackingStartDate, dueDay),
+      trackingStartDate,
       reminderTime: value.reminderTime || '09:00',
       active: value.active !== false,
       createdAt,
@@ -287,6 +308,19 @@ export class WalletService {
 
   private amount(value?: number): number {
     return Math.round(Math.max(0, Number(value) || 0) * 100) / 100;
+  }
+
+  private validDate(value?: string): boolean {
+    return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T12:00:00`).getTime());
+  }
+
+  private dateWithDay(reference: string, dueDay?: number): string {
+    const date = new Date(`${reference}T12:00:00`);
+    const day = Math.min(
+      Math.max(1, Math.round(Number(dueDay) || 1)),
+      new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate(),
+    );
+    return `${reference.slice(0, 8)}${String(day).padStart(2, '0')}`;
   }
 
   private persist(): void {
