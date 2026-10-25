@@ -1,4 +1,4 @@
-package io.ionic.starter;
+package com.todoenorden.app;
 
 import android.app.AlarmManager;
 import android.app.NotificationManager;
@@ -30,7 +30,7 @@ import java.util.Set;
 @CapacitorPlugin(name = "AgendaReminder")
 public class AgendaReminderPlugin extends Plugin {
     private static final String TAG = "AgendaReminder";
-    static final String ACTION_REMINDER = "io.ionic.starter.ACTION_URGENT_REMINDER";
+    static final String ACTION_REMINDER = "com.todoenorden.app.ACTION_URGENT_REMINDER";
     static final String EXTRA_REMINDER = "agendaReminder";
     private static final String PREFS = "agenda_urgent_reminders";
     private static final String REMINDERS = "reminders";

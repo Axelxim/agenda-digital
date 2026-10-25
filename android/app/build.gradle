@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "io.ionic.starter"
+    namespace = "com.todoenorden.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.todoenorden.app"

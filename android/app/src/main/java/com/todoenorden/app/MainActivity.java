@@ -1,4 +1,4 @@
-package io.ionic.starter;
+package com.todoenorden.app;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
