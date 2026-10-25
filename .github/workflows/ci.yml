@@ -1,18 +1,19 @@
-
-name: Integracion Continua - Agenda Digital -
-
+name: Integracion continua
 
 on:
   push:
     branches:
       - master
+      - main
+      - backend-api
   pull_request:
     branches:
+      - master
       - main
 
 jobs:
-  build:
-    name: Compilar aplicacion
+  frontend:
+    name: Validar aplicacion Angular
     runs-on: ubuntu-latest
 
     steps:
@@ -28,5 +29,35 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Compilar proyecto
-        run:   run: npm run
+      - name: Revisar codigo
+        run: npm run lint
+
+      - name: Ejecutar pruebas
+        run: npm test -- --watch=false
+
+      - name: Compilar aplicacion
+        run: npm run build
+
+  backend:
+    name: Validar API CodeIgniter
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: intl, mbstring, mysqli
+          coverage: none
+
+      - name: Instalar dependencias
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Ejecutar pruebas
+        run: composer test
