@@ -907,7 +907,12 @@
           <ion-buttons slot="start"><ion-button fill="clear" aria-label="Volver a tratamientos" (click)="cerrarHistorialTratamiento()"><ion-icon name="chevron-back-outline"></ion-icon></ion-button></ion-buttons>
           }
           <ion-title>{{ selectedHistoryGroup ? 'Historial' : 'Mis tratamientos' }}</ion-title>
-          <ion-buttons slot="end"><ion-button fill="clear" aria-label="Cerrar tratamientos" (click)="cerrarTratamientos()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons>
+          <ion-buttons slot="end">
+            @if (!selectedHistoryGroup) {
+            <ion-button fill="clear" aria-label="Agregar tratamiento" (click)="agregarTratamientoDesdeAdministrador()"><ion-icon name="add"></ion-icon></ion-button>
+            }
+            <ion-button fill="clear" aria-label="Cerrar tratamientos" (click)="cerrarTratamientos()"><ion-icon name="close"></ion-icon></ion-button>
+          </ion-buttons>
         </ion-toolbar>
       </ion-header>
       <ion-content class="modal-content">

@@ -2068,6 +2068,13 @@ export class HomePage implements OnInit, OnDestroy {
     this.treatmentsModal?.dismiss();
   }
 
+  async agregarTratamientoDesdeAdministrador(): Promise<void> {
+    await this.treatmentsModal?.dismiss();
+    this.startNewTreatment();
+    this.returnToTreatmentManager = true;
+    await this.wellnessModal?.present();
+  }
+
   async nuevoMedicamentoDesdeFab(): Promise<void> {
     if (!this.wellnessSettings.enabled) return;
     this.medicationTreatments = this.wellnessService.loadTreatments();
@@ -2134,6 +2141,10 @@ export class HomePage implements OnInit, OnDestroy {
       return;
     }
     if (this.wellnessView === 'treatment') {
+      if (this.returnToTreatmentManager) {
+        this.volverAlAdministradorDeTratamientos();
+        return;
+      }
       this.cerrarBienestar();
     }
   }
@@ -2277,6 +2288,10 @@ export class HomePage implements OnInit, OnDestroy {
     this.medicationDoses = this.wellnessService.getDoses();
     this.buildCalendar();
     this.syncNotifications(true);
+    if (this.returnToTreatmentManager) {
+      this.volverAlAdministradorDeTratamientos();
+      return;
+    }
     this.cerrarBienestar();
   }
 
