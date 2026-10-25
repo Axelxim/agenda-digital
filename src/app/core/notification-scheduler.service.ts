@@ -26,7 +26,6 @@ interface AgendaReminderPayload {
 interface AgendaReminderPlugin {
   sync(options: { remindersJson: string }): Promise<void>;
   cancel(options: { ids: number[] }): Promise<void>;
-  checkFullScreenPermission(): Promise<{ granted: boolean }>;
   requestFullScreenPermission(): Promise<void>;
   checkBatteryOptimization(): Promise<{ supported: boolean; ignoring: boolean }>;
   requestBatteryOptimizationExemption(): Promise<void>;
@@ -118,37 +117,10 @@ export class NotificationSchedulerService {
     return AgendaReminder.checkBatteryOptimization();
   }
 
-  async checkNotificationPermission(): Promise<boolean> {
-    if (!Capacitor.isNativePlatform()) return true;
-    const permission = await LocalNotifications.checkPermissions();
-    return permission.display === 'granted';
-  }
-
   async requestNotificationPermission(): Promise<boolean> {
     if (!Capacitor.isNativePlatform()) return true;
     const permission = await LocalNotifications.requestPermissions();
     return permission.display === 'granted';
-  }
-
-  async checkExactAlarmPermission(): Promise<boolean> {
-    if (Capacitor.getPlatform() !== 'android') return true;
-    const permission = await LocalNotifications.checkExactNotificationSetting();
-    return permission.exact_alarm === 'granted';
-  }
-
-  async requestExactAlarmPermission(): Promise<void> {
-    if (Capacitor.getPlatform() !== 'android') return;
-    await LocalNotifications.changeExactNotificationSetting();
-  }
-
-  async checkFullScreenPermission(): Promise<boolean> {
-    if (Capacitor.getPlatform() !== 'android') return true;
-    return (await AgendaReminder.checkFullScreenPermission()).granted;
-  }
-
-  async requestFullScreenPermission(): Promise<void> {
-    if (Capacitor.getPlatform() !== 'android') return;
-    await AgendaReminder.requestFullScreenPermission();
   }
 
   async requestBatteryOptimizationExemption(): Promise<void> {

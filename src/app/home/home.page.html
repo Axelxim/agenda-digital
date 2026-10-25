@@ -1396,48 +1396,6 @@
     </ng-template>
   </ion-modal>
 
-  <ion-modal #permissionSetupModal cssClass="settings-reminder-modal first-run-permissions-modal" [backdropDismiss]="false" [canDismiss]="false">
-    <ng-template>
-      <ion-header>
-        <ion-toolbar><ion-title>Preparar recordatorios</ion-title></ion-toolbar>
-      </ion-header>
-      <ion-content class="modal-content">
-        <section class="permission-setup">
-          <div class="permission-setup-intro">
-            <strong>Configura los avisos de Agenda</strong>
-            <span>Activa estos permisos para recibir recordatorios puntuales, incluso con el teléfono bloqueado.</span>
-          </div>
-
-          <article class="permission-setup-row" [class.ready]="notificationPermissionStatus === 'granted'">
-            <span class="permission-setup-icon"><ion-icon name="notifications-outline"></ion-icon></span>
-            <span><strong>Notificaciones</strong><small>Permite mostrar y hacer sonar los avisos.</small></span>
-            <button type="button" [disabled]="permissionRequestInProgress !== null || notificationPermissionStatus === 'granted'" (click)="solicitarPermisoInicialNotificaciones()">{{ notificationPermissionStatus === 'granted' ? 'Listo' : 'Permitir' }}</button>
-          </article>
-
-          <article class="permission-setup-row" [class.ready]="exactAlarmPermissionStatus === 'granted'">
-            <span class="permission-setup-icon"><ion-icon name="time-outline"></ion-icon></span>
-            <span><strong>Alarmas exactas</strong><small>Evita que Android retrase la hora programada.</small></span>
-            <button type="button" [disabled]="permissionRequestInProgress !== null || exactAlarmPermissionStatus === 'granted'" (click)="solicitarPermisoInicialAlarmas()">{{ exactAlarmPermissionStatus === 'granted' ? 'Listo' : 'Configurar' }}</button>
-          </article>
-
-          <article class="permission-setup-row" [class.ready]="fullScreenPermissionStatus === 'granted'">
-            <span class="permission-setup-icon"><ion-icon name="checkbox-outline"></ion-icon></span>
-            <span><strong>Pantalla de recordatorio</strong><small>Permite abrir el aviso sobre la pantalla bloqueada.</small></span>
-            <button type="button" [disabled]="permissionRequestInProgress !== null || fullScreenPermissionStatus === 'granted'" (click)="solicitarPermisoInicialPantalla()">{{ fullScreenPermissionStatus === 'granted' ? 'Listo' : 'Configurar' }}</button>
-          </article>
-
-          <article class="permission-setup-row" [class.ready]="batteryOptimizationStatus === 'protected' || batteryOptimizationStatus === 'unavailable'">
-            <span class="permission-setup-icon"><ion-icon name="battery-charging-outline"></ion-icon></span>
-            <span><strong>Actividad en segundo plano</strong><small>Impide que el ahorro de batería detenga las alarmas.</small></span>
-            <button type="button" [disabled]="permissionRequestInProgress !== null || batteryOptimizationStatus === 'protected' || batteryOptimizationStatus === 'unavailable'" (click)="solicitarPermisoInicialBateria()">{{ batteryOptimizationStatus === 'protected' ? 'Listo' : batteryOptimizationStatus === 'unavailable' ? 'No requerido' : 'Configurar' }}</button>
-          </article>
-
-          <button type="button" class="permission-setup-finish" (click)="finalizarConfiguracionInicial()">Continuar a la agenda</button>
-          <small class="permission-setup-note">Puedes revisar estos permisos después desde el engranaje.</small>
-        </section>
-      </ion-content>
-    </ng-template>
-  </ion-modal>
 </ion-content>
 
 @if (!eventEditorOpen) {

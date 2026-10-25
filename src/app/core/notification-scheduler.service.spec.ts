@@ -14,12 +14,6 @@ describe('NotificationSchedulerService', () => {
     service = TestBed.inject(NotificationSchedulerService);
   });
 
-  it('does not block the web app while native permissions are unavailable', async () => {
-    await expect(service.checkNotificationPermission()).resolves.toBe(true);
-    await expect(service.checkExactAlarmPermission()).resolves.toBe(true);
-    await expect(service.checkFullScreenPermission()).resolves.toBe(true);
-  });
-
   it('builds stable, unique notifications including the due question', () => {
     const settings = allSettings();
     settings.Universidad = {

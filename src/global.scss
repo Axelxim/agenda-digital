@@ -1659,99 +1659,6 @@ ion-modal.treatments-manager-modal ion-content {
   --padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
 
-.first-run-permissions-modal .permission-setup {
-  display: grid;
-  gap: 10px;
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 16px 14px max(24px, env(safe-area-inset-bottom));
-}
-
-.first-run-permissions-modal .permission-setup-intro {
-  display: grid;
-  gap: 5px;
-  padding: 2px 2px 8px;
-}
-
-.first-run-permissions-modal .permission-setup-intro strong {
-  color: var(--text);
-  font-size: 16px;
-}
-
-.first-run-permissions-modal .permission-setup-intro span,
-.first-run-permissions-modal .permission-setup-note,
-.first-run-permissions-modal .permission-setup-row small {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.first-run-permissions-modal .permission-setup-row {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  min-height: 72px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-}
-
-.first-run-permissions-modal .permission-setup-row.ready {
-  border-color: var(--success-border);
-  background: var(--success-surface);
-}
-
-.first-run-permissions-modal .permission-setup-row > span:nth-child(2) {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.first-run-permissions-modal .permission-setup-icon {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--primary-surface);
-  color: var(--primary);
-  font-size: 21px;
-}
-
-.first-run-permissions-modal .permission-setup-row button {
-  min-width: 86px;
-  min-height: 40px;
-  padding: 0 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-  background: var(--soft);
-  color: var(--primary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.first-run-permissions-modal .permission-setup-row button:disabled {
-  opacity: .65;
-}
-
-.first-run-permissions-modal .permission-setup-finish {
-  min-height: 48px;
-  margin-top: 4px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--primary);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.first-run-permissions-modal .permission-setup-note {
-  text-align: center;
-}
-
 .settings-reminder-modal .reminder-settings {
   max-width: 620px;
   margin: 0 auto;
@@ -2679,8 +2586,6 @@ ion-modal.treatments-manager-modal ion-content {
 }
 
 @media (max-width: 380px) {
-  .first-run-permissions-modal .permission-setup-row { grid-template-columns: 42px minmax(0, 1fr); }
-  .first-run-permissions-modal .permission-setup-row button { grid-column: 2; justify-self: start; }
   .settings-side-menu .settings-side-nav > button { grid-template-columns: 40px minmax(0, 1fr) 18px; }
   .settings-side-menu .settings-side-state { display: none; }
   .global-search-modal .global-search-results > button { grid-template-columns: 40px minmax(0, 1fr) 18px; }

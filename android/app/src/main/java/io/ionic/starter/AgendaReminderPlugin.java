@@ -93,20 +93,6 @@ public class AgendaReminderPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void checkFullScreenPermission(PluginCall call) {
-        JSObject result = new JSObject();
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            result.put("granted", true);
-            call.resolve(result);
-            return;
-        }
-
-        NotificationManager manager = getContext().getSystemService(NotificationManager.class);
-        result.put("granted", manager != null && manager.canUseFullScreenIntent());
-        call.resolve(result);
-    }
-
-    @PluginMethod
     public void checkBatteryOptimization(PluginCall call) {
         JSObject result = new JSObject();
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {

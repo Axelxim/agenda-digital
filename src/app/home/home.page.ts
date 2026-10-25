@@ -110,7 +110,6 @@ type WellnessView = 'treatment' | 'medication';
 type MedicationHistoryStatus = 'taken' | 'late' | 'missed' | 'overdue' | 'pending';
 type MedicationHistoryFilter = 'all' | MedicationHistoryStatus;
 type WalletView = 'dashboard' | 'transaction' | 'fixed' | 'payment' | 'settings';
-type PermissionSetupStatus = 'checking' | 'pending' | 'granted' | 'unavailable';
 
 interface TreatmentMedicationDraft {
   key: string;
@@ -225,7 +224,6 @@ export class HomePage implements OnInit, OnDestroy {
   @ViewChild('settingsModal') settingsModal?: IonModal;
   @ViewChild('deviceCalendarModal') deviceCalendarModal?: IonModal;
   @ViewChild('batteryModal') batteryModal?: IonModal;
-  @ViewChild('permissionSetupModal') permissionSetupModal?: IonModal;
   @ViewChild('wellnessModal') wellnessModal?: IonModal;
   @ViewChild('treatmentsModal') treatmentsModal?: IonModal;
   @ViewChild('globalSearchModal') globalSearchModal?: IonModal;
@@ -264,11 +262,6 @@ export class HomePage implements OnInit, OnDestroy {
   notificationSyncStatus: NotificationSyncStatus | 'idle' | 'error' = 'idle';
   batteryOptimizationStatus: 'checking' | 'protected' | 'restricted' | 'unavailable' = 'checking';
   batteryDeviceInfo = { manufacturer: 'Android', family: 'android' };
-  notificationPermissionStatus: PermissionSetupStatus = 'checking';
-  exactAlarmPermissionStatus: PermissionSetupStatus = 'checking';
-  fullScreenPermissionStatus: PermissionSetupStatus = 'checking';
-  permissionRequestInProgress: 'notifications' | 'exact' | 'fullscreen' | 'battery' | null = null;
-  permissionSetupVisible = false;
   calendarEditError = '';
   deviceCalendarStatus: 'idle' | 'loading' | 'ready' | 'denied' | 'unavailable' | 'error' = 'idle';
   deviceCalendars: DeviceCalendar[] = [];
@@ -390,7 +383,7 @@ export class HomePage implements OnInit, OnDestroy {
   private calendarChangeListener?: PluginListenerHandle;
   private notificationActionListener?: PluginListenerHandle;
   private calendarRefreshTimer?: ReturnType<typeof setTimeout>;
-  private permissionPromptTimer?: ReturnType<typeof setTimeout>;
+  private initialPermissionTimer?: ReturnType<typeof setTimeout>;
   private readonly liveStateSubscriptions = new Subscription();
   private lastClockMinute = '';
   private lastStoredRefreshAt = 0;
@@ -402,7 +395,7 @@ export class HomePage implements OnInit, OnDestroy {
   private reminderSettingsReady = false;
   private readonly fabPositionKey = 'home-fab-position';
   private readonly advancedModeKey = 'agenda-advanced-mode';
-  private readonly permissionSetupKey = 'agenda-permission-setup-v1';
+  private readonly initialPermissionKey = 'agenda-native-permissions-v1';
   private fabDrag?: {
     pointerId: number;
     startX: number;
@@ -524,7 +517,6 @@ export class HomePage implements OnInit, OnDestroy {
         this.refreshStoredState();
         void this.refreshDeviceCalendarEvents();
         void this.refreshBatteryOptimizationStatus();
-        if (this.permissionSetupVisible) void this.refreshInitialPermissionStatus();
       }).then((listener) => {
         this.appResumeListener = listener;
       });
@@ -537,7 +529,7 @@ export class HomePage implements OnInit, OnDestroy {
     }
     this.updateLiveClock();
     this.currentTimeTimer = setInterval(() => this.updateLiveClock(), 1_000);
-    this.permissionPromptTimer = setTimeout(() => void this.presentInitialPermissionSetup(), 700);
+    this.initialPermissionTimer = setTimeout(() => void this.requestInitialAndroidPermissions(), 700);
   }
 
   ngOnDestroy(): void {
@@ -552,7 +544,7 @@ export class HomePage implements OnInit, OnDestroy {
     window.removeEventListener('focus', this.windowFocusListener);
     document.removeEventListener('visibilitychange', this.visibilityChangeListener);
     if (this.calendarRefreshTimer) clearTimeout(this.calendarRefreshTimer);
-    if (this.permissionPromptTimer) clearTimeout(this.permissionPromptTimer);
+    if (this.initialPermissionTimer) clearTimeout(this.initialPermissionTimer);
   }
 
   private connectLiveState(): void {
@@ -2687,87 +2679,18 @@ export class HomePage implements OnInit, OnDestroy {
       : `subtask-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  private async presentInitialPermissionSetup(): Promise<void> {
-    if (Capacitor.getPlatform() !== 'android' || localStorage.getItem(this.permissionSetupKey) === 'done') return;
-    await this.refreshInitialPermissionStatus();
-    this.permissionSetupVisible = true;
-    await this.permissionSetupModal?.present();
-  }
+  private async requestInitialAndroidPermissions(): Promise<void> {
+    if (Capacitor.getPlatform() !== 'android' || localStorage.getItem(this.initialPermissionKey) === 'done') return;
+    localStorage.setItem(this.initialPermissionKey, 'done');
 
-  private async refreshInitialPermissionStatus(): Promise<void> {
-    const [notifications, exactAlarm, fullScreen] = await Promise.all([
-      this.notificationScheduler.checkNotificationPermission().catch(() => false),
-      this.notificationScheduler.checkExactAlarmPermission().catch(() => false),
-      this.notificationScheduler.checkFullScreenPermission().catch(() => false),
-    ]);
-    this.notificationPermissionStatus = notifications ? 'granted' : 'pending';
-    this.exactAlarmPermissionStatus = exactAlarm ? 'granted' : 'pending';
-    this.fullScreenPermissionStatus = fullScreen ? 'granted' : 'pending';
-    await this.refreshBatteryOptimizationStatus();
-    this.refreshView();
-  }
-
-  async solicitarPermisoInicialNotificaciones(): Promise<void> {
-    this.permissionRequestInProgress = 'notifications';
     try {
-      const granted = await this.notificationScheduler.requestNotificationPermission();
-      this.notificationPermissionStatus = granted ? 'granted' : 'pending';
-      if (granted) this.syncNotifications();
-    } catch {
-      this.notificationPermissionStatus = 'unavailable';
-    } finally {
-      this.permissionRequestInProgress = null;
-      this.refreshView();
+      const notificationsGranted = await this.notificationScheduler.requestNotificationPermission();
+      if (notificationsGranted) this.syncNotifications();
+    } catch (error) {
+      console.warn('No fue posible solicitar el permiso de notificaciones.', error);
     }
-  }
 
-  async solicitarPermisoInicialAlarmas(): Promise<void> {
-    this.permissionRequestInProgress = 'exact';
-    try {
-      await this.notificationScheduler.requestExactAlarmPermission();
-      this.exactAlarmPermissionStatus = await this.notificationScheduler.checkExactAlarmPermission()
-        ? 'granted'
-        : 'pending';
-    } catch {
-      this.exactAlarmPermissionStatus = 'unavailable';
-    } finally {
-      this.permissionRequestInProgress = null;
-      this.refreshView();
-    }
-  }
-
-  async solicitarPermisoInicialPantalla(): Promise<void> {
-    this.permissionRequestInProgress = 'fullscreen';
-    try {
-      await this.notificationScheduler.requestFullScreenPermission();
-      this.fullScreenPermissionStatus = await this.notificationScheduler.checkFullScreenPermission()
-        ? 'granted'
-        : 'pending';
-    } catch {
-      this.fullScreenPermissionStatus = 'unavailable';
-    } finally {
-      this.permissionRequestInProgress = null;
-      this.refreshView();
-    }
-  }
-
-  async solicitarPermisoInicialBateria(): Promise<void> {
-    this.permissionRequestInProgress = 'battery';
-    try {
-      await this.notificationScheduler.requestBatteryOptimizationExemption();
-      await this.refreshBatteryOptimizationStatus();
-    } catch {
-      this.batteryOptimizationStatus = 'unavailable';
-    } finally {
-      this.permissionRequestInProgress = null;
-      this.refreshView();
-    }
-  }
-
-  finalizarConfiguracionInicial(): void {
-    localStorage.setItem(this.permissionSetupKey, 'done');
-    this.permissionSetupVisible = false;
-    this.permissionSetupModal?.dismiss();
+    await this.deviceCalendarService.requestInitialPermissions();
   }
 
   async abrirConfiguracionBateria(): Promise<void> {
