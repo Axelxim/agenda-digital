@@ -1,0 +1,44 @@
+@media (max-width: 480px) {
+  .event-editor-screen { align-items: center; padding: 8px; }
+  .event-editor-panel { width: 100%; max-width: none; max-height: calc(100dvh - 16px); border-radius: 18px; }
+  .event-editor-header { min-height: 60px; padding-inline: 12px; }
+  .event-editor-header h1 { font-size: 20px; }
+  .event-editor-content { gap: 10px; padding: 18px 14px 14px; }
+  .editor-field ion-input { min-height: 50px; }
+  .editor-time-row { gap: 8px; }
+  .editor-time-row .editor-field > ion-icon { display: none; }
+  .editor-time-row .editor-field ion-input { --padding-start: 12px; --padding-end: 6px; min-width: 0; font-size: 14px; }
+  .editor-time-row .editor-field ion-input::part(native) { font-size: 14px; }
+  .editor-repeat, .editor-color { min-height: 58px; }
+  .editor-delete { margin-top: 6px; }
+  .page-shell { padding: 12px 12px 88px; }
+  .calendar-header { display: grid; grid-template-columns: 1fr; gap: 4px; }
+  .calendar-header .calendar-actions { justify-self: center; }
+  .calendar-header .calendar-actions ion-button { width: 36px; min-height: 36px; margin: 0; }
+  .calendar-header .today-button { min-height: 34px; padding-inline: 9px; }
+  .event-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .current-events { gap: 5px; }
+  .section-heading h2 { font-size: 15px; }
+  .current-event { gap: 8px; padding: 9px; border-left-width: 4px; }
+  .current-event strong { font-size: 13px; }
+  .current-event small { font-size: 11px; }
+  .day-complete { grid-column: auto; min-height: 42px; padding: 8px; font-size: 12px; text-align: center; }
+  .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin-bottom: 12px; }
+  .summary-card { min-height: 52px; padding: 7px 3px; }
+  .summary-card strong { font-size: 17px; }
+  .summary-card span { margin-top: 3px; font-size: 10px; }
+  .section-stack { gap: 10px; }
+  .empty-state { padding: 16px 12px; }
+}
+
+@media (max-width: 640px) {
+  /* Las dos tarjetas de eventos comparten siempre la fila en teléfono. */
+  .event-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .event-overview > .current-events { min-width: 0; }
+  .event-overview .section-heading h2 { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+  .event-overview .current-event { min-height: 50px; padding: 8px; }
+  .page-shell { padding-inline: 12px; }
+  .agenda-controls { margin-inline: -12px; padding-inline: 12px; }
+  .calendar-grid { gap: 4px; padding: 6px; }
+  .calendar-day { min-height: 38px; border-radius: 6px; }
+}

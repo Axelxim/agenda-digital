@@ -25,6 +25,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 @CapacitorPlugin(name = "AgendaReminder")
@@ -73,6 +74,28 @@ public class AgendaReminderPlugin extends Plugin {
             call.resolve();
         } catch (Exception error) {
             call.reject("No fue posible cancelar los avisos insistentes", error);
+        }
+    }
+
+    static void cancelTaskReminders(Context context, long taskId) {
+        try {
+            JSONArray stored = storedReminders(context);
+            JSONArray remaining = new JSONArray();
+            Set<Integer> cancelledIds = new HashSet<>();
+            for (int index = 0; index < stored.length(); index++) {
+                JSONObject reminder = stored.getJSONObject(index);
+                if (reminder.optLong("taskId", Long.MIN_VALUE) == taskId) {
+                    int id = reminder.getInt("id");
+                    cancelledIds.add(id);
+                    cancelOne(context, id);
+                } else {
+                    remaining.put(reminder);
+                }
+            }
+            preferences(context).edit().putString(REMINDERS, remaining.toString()).apply();
+            ReminderAlarmService.stopIfActive(context, cancelledIds);
+        } catch (Exception error) {
+            Log.w(TAG, "No fue posible cancelar los recordatorios desde el widget", error);
         }
     }
 
@@ -185,7 +208,7 @@ public class AgendaReminderPlugin extends Plugin {
 
     private String batterySettingsFamily() {
         String maker = ((Build.MANUFACTURER == null ? "" : Build.MANUFACTURER) + " "
-            + (Build.BRAND == null ? "" : Build.BRAND)).toLowerCase();
+            + (Build.BRAND == null ? "" : Build.BRAND)).toLowerCase(Locale.ROOT);
         if (maker.contains("infinix") || maker.contains("tecno") || maker.contains("itel") || maker.contains("transsion")) return "xos";
         if (maker.contains("xiaomi") || maker.contains("redmi") || maker.contains("poco")) return "xiaomi";
         if (maker.contains("samsung")) return "samsung";

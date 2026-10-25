@@ -4,4 +4,16 @@
     <string name="title_activity_main">Todo en Orden</string>
     <string name="package_name">com.todoenorden.app</string>
     <string name="custom_url_scheme">com.todoenorden.app</string>
+    <string name="agenda_widget_description">Consulta tu próximo evento y las tareas del día</string>
+    <string name="widget_next_event">Próximo evento</string>
+    <string name="widget_pending">Pendientes</string>
+    <string name="widget_today_tasks">Tareas programadas para hoy</string>
+    <string name="widget_event_placeholder_title">Sin eventos pr&#243;ximos</string>
+    <string name="widget_event_placeholder_time">Tu agenda est&#225; libre</string>
+    <string name="reminder_close">Cerrar</string>
+    <string name="reminder_remaining">Faltan\n</string>
+    <string name="reminder_wallet_remaining">Vence en\n</string>
+    <string name="reminder_overdue">Venci&#243; hace\n</string>
+    <string name="reminder_medication_overdue">Deb&#237;as tomarlo hace\n</string>
+    <string name="reminder_countdown">%1$s%2$s</string>
 </resources>

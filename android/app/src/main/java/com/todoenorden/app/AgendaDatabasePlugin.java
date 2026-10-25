@@ -46,6 +46,7 @@ public class AgendaDatabasePlugin extends Plugin {
             JSObject result = new JSObject();
             result.put("tasksJson", loadTasks(database).toString());
             result.put("presetsJson", loadPresets(database).toString());
+            AgendaWidgetProvider.updateAllWidgets(getContext());
             call.resolve(result);
         } catch (Exception error) {
             call.reject("No fue posible inicializar la base de datos local", error);
@@ -63,6 +64,7 @@ public class AgendaDatabasePlugin extends Plugin {
             } finally {
                 database.endTransaction();
             }
+            AgendaWidgetProvider.updateAllWidgets(getContext());
             call.resolve();
         } catch (Exception error) {
             call.reject("No fue posible guardar las tareas", error);

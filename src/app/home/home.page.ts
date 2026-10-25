@@ -177,7 +177,13 @@ interface TimedEventLayout {
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
-  styleUrls: ['home.page.scss'],
+  styleUrls: [
+    'home.page.scss',
+    'home.page-calendar.scss',
+    'home.page-forms.scss',
+    'home.page-components.scss',
+    'home.page-responsive.scss',
+  ],
   imports: [
     FormsModule,
     NgTemplateOutlet,
@@ -360,6 +366,7 @@ export class HomePage implements OnInit, OnDestroy {
   nuevaFecha = '';
   nuevaHora = '';
   nuevaHoraFin = '';
+  taskScheduleEnabled = false;
   taskSubtasks: TaskSubtask[] = [];
   newSubtaskTitle = '';
   advancedModeEnabled = false;
@@ -373,6 +380,7 @@ export class HomePage implements OnInit, OnDestroy {
   presetHorarios: EventPresetSchedule[] = [];
   presetActiveDay: number | null = null;
   editingPresetId: number | null = null;
+  routineEditorOpen = false;
   prioridad: TaskPriority = 'media';
   etiqueta: TaskLabel | undefined = undefined;
   actividadMadreId: number | undefined = undefined;
@@ -380,6 +388,7 @@ export class HomePage implements OnInit, OnDestroy {
   repeticion: TaskRepeat = 'none';
   private currentTimeTimer?: ReturnType<typeof setInterval>;
   private appResumeListener?: PluginListenerHandle;
+  private appBackButtonListener?: PluginListenerHandle;
   private calendarChangeListener?: PluginListenerHandle;
   private notificationActionListener?: PluginListenerHandle;
   private calendarRefreshTimer?: ReturnType<typeof setTimeout>;
@@ -410,6 +419,7 @@ export class HomePage implements OnInit, OnDestroy {
   fabOffsetY = 0;
   fabListSide: 'top' | 'bottom' = 'top';
   fabDragging = false;
+  medicationHomeExpanded = false;
 
   readonly etiquetas = this.taskService.etiquetas;
   readonly reminderLeadOptions = this.labelReminderService.leadOptions;
@@ -527,6 +537,13 @@ export class HomePage implements OnInit, OnDestroy {
         this.calendarChangeListener = listener;
       });
     }
+    if (Capacitor.getPlatform() === 'android') {
+      void App.addListener('backButton', () => {
+        void this.handleAndroidBack();
+      }).then((listener) => {
+        this.appBackButtonListener = listener;
+      });
+    }
     this.updateLiveClock();
     this.currentTimeTimer = setInterval(() => this.updateLiveClock(), 1_000);
     this.initialPermissionTimer = setTimeout(() => void this.requestInitialAndroidPermissions(), 700);
@@ -537,6 +554,7 @@ export class HomePage implements OnInit, OnDestroy {
       clearInterval(this.currentTimeTimer);
     }
     void this.appResumeListener?.remove();
+    void this.appBackButtonListener?.remove();
     void this.calendarChangeListener?.remove();
     void this.notificationActionListener?.remove();
     this.liveStateSubscriptions.unsubscribe();
@@ -595,7 +613,7 @@ export class HomePage implements OnInit, OnDestroy {
     if (now - this.lastStoredRefreshAt < 250) return;
     this.lastStoredRefreshAt = now;
     this.currentTime = new Date();
-    this.taskService.load();
+    if (Capacitor.getPlatform() !== 'android') this.taskService.load();
     this.preestablecidos = this.taskService.loadEventPresets();
     this.labelReminderSettings = this.labelReminderService.load(
       this.etiquetas.map((label) => label.nombre),
@@ -608,8 +626,77 @@ export class HomePage implements OnInit, OnDestroy {
     this.quickNotes = this.noteService.load();
     this.walletState = this.walletService.load();
     this.buildCalendar();
-    this.syncNotifications();
+    if (Capacitor.getPlatform() !== 'android') this.syncNotifications();
     this.refreshView();
+    if (Capacitor.getPlatform() === 'android') {
+      void this.taskService.initializePersistence().then(({ tasks, presets }) => {
+        this.preestablecidos = presets;
+        this.setTasks(tasks);
+      });
+    }
+  }
+
+  private async handleAndroidBack(): Promise<void> {
+    if (this.eventCancelAlertOpen) {
+      this.cancelarConfirmacionEvento();
+      return;
+    }
+    if (this.eventEditorOpen) {
+      this.cerrarEditorEvento();
+      return;
+    }
+    if (this.birthdayEditorOpen) {
+      this.cerrarEditorCumpleanos();
+      return;
+    }
+    if (this.selectedEvent) {
+      this.cerrarDetalleEvento();
+      return;
+    }
+    if (await this.menuController.isOpen('settings-menu')) {
+      await this.menuController.close('settings-menu');
+      return;
+    }
+
+    const topModal = document.querySelector<HTMLIonModalElement>('ion-modal.modal-top');
+    if (topModal) {
+      if (topModal.id === 'task-editor-modal') {
+        this.cerrarModal();
+        return;
+      }
+      if (topModal.id === 'routines-modal' && this.routineEditorOpen) {
+        this.cancelarEdicionPreestablecido();
+        return;
+      }
+      if (topModal.id === 'wellness-modal' && this.wellnessView === 'medication') {
+        this.volverDesdeBienestar();
+        return;
+      }
+      if (topModal.id === 'treatments-modal' && this.selectedHistoryGroupKey) {
+        this.cerrarHistorialTratamiento();
+        return;
+      }
+      if (topModal.id === 'notes-modal' && this.notesView === 'editor') {
+        this.resetNoteEditor();
+        return;
+      }
+      if (topModal.id === 'wallet-modal' && this.walletView !== 'dashboard') {
+        this.walletView = 'dashboard';
+        return;
+      }
+      await topModal.dismiss();
+      return;
+    }
+
+    if (this.expandedTaskId !== null) {
+      this.expandedTaskId = null;
+      return;
+    }
+    if (this.selectedView !== 'hoy') {
+      this.selectView('hoy');
+      return;
+    }
+    await App.exitApp();
   }
 
   private refreshView(): void {
@@ -624,9 +711,12 @@ export class HomePage implements OnInit, OnDestroy {
         'proximas',
         'vencidas',
       ];
-      return homeOrder.flatMap((id) =>
-        this.secciones.filter((section) => section.id === id),
-      );
+      return homeOrder
+        .flatMap((id) => this.secciones.filter((section) => section.id === id))
+        .map((section) => section.id === 'proximas'
+          ? { ...section, tareas: section.tareas.filter((tarea) => tarea.tipo === 'tarea') }
+          : section)
+        .filter((section) => section.tareas.length > 0);
     }
 
     return this.secciones;
@@ -647,7 +737,9 @@ export class HomePage implements OnInit, OnDestroy {
 
     if (this.pendingFilter === 'vencidas') {
       return this.tareas.filter(
-        (tarea) => tarea.tipo === 'tarea' && tarea.estado === 'vencida',
+        (tarea) =>
+          tarea.tipo === 'tarea' &&
+          (tarea.estado === 'vencida' || tarea.estado === 'ignorada'),
       );
     }
 
@@ -787,6 +879,11 @@ export class HomePage implements OnInit, OnDestroy {
 
   get timeRangeInvalid(): boolean {
     return !!this.nuevaHora && !!this.nuevaHoraFin && this.nuevaHoraFin <= this.nuevaHora;
+  }
+
+  get taskSchedulingInvalid(): boolean {
+    if (this.formItemType !== 'tarea') return false;
+    return this.taskScheduleEnabled && !this.nuevaFecha;
   }
 
   get weekDays(): WeekDay[] {
@@ -999,7 +1096,8 @@ export class HomePage implements OnInit, OnDestroy {
     this.formMode = 'create';
     this.formItemType = 'tarea';
     this.editingTaskId = null;
-    this.resetForm(fecha);
+    this.resetForm(fecha ?? this.taskService.toISODate(new Date()));
+    this.taskScheduleEnabled = !!fecha;
     this.nuevaHora = hora ?? '';
     this.nuevaHoraFin = hora ? this.addMinutesToTime(hora, 60) : '';
     this.eventColor = '#2563eb';
@@ -1010,7 +1108,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.formMode = 'create';
     this.formItemType = 'evento';
     this.editingTaskId = null;
-    this.resetForm(fecha);
+    this.resetForm(fecha ?? this.taskService.toISODate(new Date()));
     this.nuevaHora = hora ?? '';
     this.nuevaHoraFin = hora ? this.addMinutesToTime(hora, 60) : '';
     this.eventColor = '#2563eb';
@@ -1171,7 +1269,7 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   async guardarFormulario(): Promise<void> {
-    if (this.timeRangeInvalid) return;
+    if (this.timeRangeInvalid || this.taskSchedulingInvalid) return;
 
     if (this.editingTaskId !== null && this.formMode === 'reschedule' && this.formItemType === 'tarea') {
       this.setTasks(
@@ -1186,12 +1284,13 @@ export class HomePage implements OnInit, OnDestroy {
       return;
     }
 
+    const taskWithoutSchedule = this.formItemType === 'tarea' && !this.taskScheduleEnabled;
     const draft = {
       titulo: this.nuevoTitulo,
       tipo: this.formItemType,
-      fecha: this.nuevaFecha,
-      hora: this.nuevaHora,
-      horaFin: this.nuevaHoraFin,
+      fecha: taskWithoutSchedule ? '' : this.nuevaFecha,
+      hora: taskWithoutSchedule ? '' : this.nuevaHora,
+      horaFin: taskWithoutSchedule ? '' : this.nuevaHoraFin,
       color: this.formItemType === 'evento' ? this.eventColor : undefined,
       prioridad: this.prioridad,
       etiqueta: this.etiqueta,
@@ -1381,6 +1480,22 @@ export class HomePage implements OnInit, OnDestroy {
     this.modal?.dismiss();
   }
 
+  setTaskScheduleEnabled(enabled: boolean): void {
+    this.taskScheduleEnabled = enabled;
+    if (enabled) {
+      this.nuevaFecha ||= this.taskService.toISODate(new Date());
+      return;
+    }
+    this.nuevaFecha = '';
+    this.nuevaHora = '';
+    this.nuevaHoraFin = '';
+    this.repeticion = 'none';
+  }
+
+  focusEndTime(input: IonInput): void {
+    window.setTimeout(() => void input.setFocus(), 0);
+  }
+
   cerrarEditorEvento(): void {
     this.eventEditorOpen = false;
     this.eventRepeatExpanded = false;
@@ -1503,9 +1618,11 @@ export class HomePage implements OnInit, OnDestroy {
       : this.taskService.updateEventPreset({ ...preset, id: this.editingPresetId });
     this.setTasks(this.taskService.getAll());
     this.resetPresetForm();
+    this.routineEditorOpen = false;
   }
 
   editarPreestablecido(preset: EventPreset): void {
+    this.routineEditorOpen = true;
     this.editingPresetId = preset.id;
     this.presetNombre = preset.nombre;
     this.presetColor = preset.color;
@@ -1521,6 +1638,12 @@ export class HomePage implements OnInit, OnDestroy {
 
   cancelarEdicionPreestablecido(): void {
     this.resetPresetForm();
+    this.routineEditorOpen = false;
+  }
+
+  nuevaRutina(): void {
+    this.resetPresetForm();
+    this.routineEditorOpen = true;
   }
 
   private resetPresetForm(): void {
@@ -1547,10 +1670,14 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   abrirPreestablecidos(): void {
+    this.resetPresetForm();
+    this.routineEditorOpen = false;
     this.presetModal?.present();
   }
 
   cerrarPreestablecidos(): void {
+    this.resetPresetForm();
+    this.routineEditorOpen = false;
     this.presetModal?.dismiss();
   }
 
@@ -2535,19 +2662,34 @@ export class HomePage implements OnInit, OnDestroy {
     return this.todayMedicationDoses.filter((dose) => dose.status === 'taken');
   }
 
+  get todayMedicationActionableDoses(): MedicationDose[] {
+    return [...this.todayMedicationOverdueDoses, ...this.todayMedicationPendingDoses];
+  }
+
+  get visibleTodayMedicationOverdueDoses(): MedicationDose[] {
+    return this.medicationHomeExpanded
+      ? this.todayMedicationOverdueDoses
+      : this.todayMedicationOverdueDoses.slice(0, 1);
+  }
+
+  get visibleTodayMedicationPendingDoses(): MedicationDose[] {
+    if (this.medicationHomeExpanded) return this.todayMedicationPendingDoses;
+    return this.todayMedicationOverdueDoses.length === 0
+      ? this.todayMedicationPendingDoses.slice(0, 1)
+      : [];
+  }
+
+  get hiddenTodayMedicationDoseCount(): number {
+    return Math.max(0, this.todayMedicationActionableDoses.length - 1);
+  }
+
+  toggleMedicationHomeExpanded(): void {
+    this.medicationHomeExpanded = !this.medicationHomeExpanded;
+  }
+
   get todayMedicationProgress(): number {
     if (this.todayMedicationDoses.length === 0) return 0;
     return Math.round((this.todayMedicationTakenDoses.length / this.todayMedicationDoses.length) * 100);
-  }
-
-  get selectedDateMedicationDoses(): MedicationDose[] {
-    return this.medicationDoses
-      .filter((dose) => {
-        if (!dose.scheduledAt.startsWith(this.selectedDate)) return false;
-        const treatment = this.medicationTreatments.find((item) => item.id === dose.treatmentId);
-        return !!treatment && !treatment.continuous;
-      })
-      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   }
 
   medicationForDose(dose: MedicationDose): MedicationTreatment | undefined {
@@ -3147,6 +3289,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaFecha = fecha;
     this.nuevaHora = '';
     this.nuevaHoraFin = '';
+    this.taskScheduleEnabled = false;
     this.taskSubtasks = [];
     this.newSubtaskTitle = '';
     this.eventColor = '#2563eb';
@@ -3162,6 +3305,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaFecha = tarea.fecha ?? '';
     this.nuevaHora = tarea.hora ?? '';
     this.nuevaHoraFin = this.taskEndTime(tarea);
+    this.taskScheduleEnabled = tarea.tipo === 'tarea' && !!tarea.fecha;
     this.taskSubtasks = tarea.subtasks?.map((subtask) => ({ ...subtask })) ?? [];
     this.newSubtaskTitle = '';
     this.eventColor = tarea.color ?? '#2563eb';
@@ -3189,8 +3333,7 @@ export class HomePage implements OnInit, OnDestroy {
         iso,
         currentMonth: date.getMonth() === month,
         selected: iso === this.selectedDate,
-        hasTasks: this.taskService.hasTasksOnDate(iso, this.calendarTasks) ||
-          this.medicationDoses.some((dose) => dose.scheduledAt.startsWith(iso)),
+        hasTasks: this.taskService.hasTasksOnDate(iso, this.calendarTasks),
       };
     });
   }

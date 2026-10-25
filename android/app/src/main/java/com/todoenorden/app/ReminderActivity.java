@@ -1,6 +1,5 @@
 package com.todoenorden.app;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -17,9 +16,12 @@ import android.widget.LinearLayout;
 import android.widget.Space;
 import android.widget.TextView;
 
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
+
 import java.util.Locale;
 
-public class ReminderActivity extends Activity {
+public class ReminderActivity extends ComponentActivity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView countdownView;
     private long dueAt;
@@ -37,6 +39,12 @@ public class ReminderActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                closeReminder();
+            }
+        });
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);
             setTurnScreenOn(true);
@@ -63,6 +71,12 @@ public class ReminderActivity extends Activity {
     protected void onStart() {
         super.onStart();
         handler.post(updateCountdown);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ReminderAlarmService.markScreenVisible(this);
     }
 
     @Override
@@ -141,7 +155,7 @@ public class ReminderActivity extends Activity {
         root.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1));
 
         Button close = new Button(this);
-        close.setText("Cerrar");
+        close.setText(R.string.reminder_close);
         close.setTextSize(17);
         close.setTextColor(Color.WHITE);
         close.setAllCaps(false);
@@ -169,17 +183,18 @@ public class ReminderActivity extends Activity {
         String time = days > 0
             ? String.format(Locale.getDefault(), "%d d\u00edas  %02d:%02d:%02d", days, hours, minutes, seconds)
             : String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds);
-        String prefix = medicationReminder
-            ? (overdue ? "Deb\u00edas tomarlo hace\n" : "Faltan\n")
-            : walletReminder
-                ? (overdue ? "Venci\u00f3 hace\n" : "Vence en\n")
-            : (overdue ? "Venci\u00f3 hace\n" : "Faltan\n");
-        countdownView.setText(prefix + time);
-    }
-
-    @Override
-    public void onBackPressed() {
-        closeReminder();
+        int prefixResource = medicationReminder && overdue
+            ? R.string.reminder_medication_overdue
+            : overdue
+                ? R.string.reminder_overdue
+                : walletReminder
+                    ? R.string.reminder_wallet_remaining
+                    : R.string.reminder_remaining;
+        countdownView.setText(getString(
+            R.string.reminder_countdown,
+            getString(prefixResource),
+            time
+        ));
     }
 
     private void closeReminder() {

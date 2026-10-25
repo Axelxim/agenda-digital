@@ -493,7 +493,7 @@ export class TaskService {
       hoy: programadas.filter((tarea) => tarea.fecha === today).length,
       manana: programadas.filter((tarea) => tarea.fecha === tomorrow).length,
       proximas: programadas.filter(
-        (tarea) => tarea.fecha! > tomorrow,
+        (tarea) => tarea.tipo === 'tarea' && tarea.fecha! > tomorrow,
       ).length,
       sinFecha: pendientes.filter((tarea) => !tarea.fecha).length,
       pendientes: pendientes.length,
