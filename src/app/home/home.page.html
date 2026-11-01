@@ -169,7 +169,7 @@
         <span>{{ homeFixedExpenses.length }}</span>
       </div>
       @for (occurrence of homeFixedExpenses; track occurrence.id) {
-      <article class="wallet-due-card" [class.today]="walletDueLabel(occurrence) === 'Vence hoy'">
+      <article class="wallet-due-card" [attr.data-occurrence-id]="occurrence.id" [style.transform]="walletSwipingOccurrenceId === occurrence.id ? 'translateX(' + walletSwipeOffset + 'px)' : ''" [class.today]="walletDueLabel(occurrence) === 'Vence hoy'" (pointerdown)="startWalletReminderSwipe($event)" (pointermove)="moveWalletReminderSwipe($event)" (pointerup)="endWalletReminderSwipe($event, occurrence)" (pointercancel)="cancelWalletReminderSwipe()">
         <span><strong>{{ occurrence.expense.name }}</strong><small>{{ walletDueLabel(occurrence) }} · {{ occurrence.expense.category }}</small></span>
         <strong>{{ walletMoney(occurrence.expense.amount) }}</strong>
         <button type="button" (click)="pagarGastoFijo(occurrence)">Pagado</button>
@@ -492,7 +492,7 @@
         <label class="editor-field">
           <span class="editor-label">Inicio</span>
           <ion-icon name="time-outline"></ion-icon>
-          <ion-input type="time" [(ngModel)]="nuevaHora" (ionChange)="focusEndTime(eventEndTimeInput)"></ion-input>
+          <ion-input type="time" [(ngModel)]="nuevaHora" (ionChange)="setEndTimeOneHourLater(eventEndTimeInput)"></ion-input>
         </label>
         <label class="editor-field">
           <span class="editor-label">Fin</span>
@@ -697,7 +697,7 @@
               label-placement="stacked"
               type="time"
               [(ngModel)]="nuevaHora"
-              (ionChange)="focusEndTime(taskEndTimeInput)"
+              (ionChange)="setEndTimeOneHourLater(taskEndTimeInput)"
             ></ion-input>
 
             <ion-input
@@ -775,6 +775,13 @@
             <ion-select-option value="weekly">Semanal</ion-select-option>
             <ion-select-option value="monthly">Mensual</ion-select-option>
           </ion-select>
+
+          @if (taskScheduleEnabled) {
+          <div class="task-schedule-option">
+            <span><strong>Recordatorio insistente</strong><small>Suena, vibra y muestra una ventana flotante a la hora programada.</small></span>
+            <ion-toggle [(ngModel)]="taskInsistentReminder" aria-label="Activar recordatorio insistente"></ion-toggle>
+          </div>
+          }
           }
 
           }
@@ -822,7 +829,7 @@
           <div class="preset-form">
             <ion-input label="Nombre de la rutina" label-placement="stacked" placeholder="Ej. Estudiar o ir al gimnasio" [(ngModel)]="presetNombre"></ion-input>
             <div class="time-range">
-              <ion-input label="Hora de inicio" label-placement="stacked" type="time" [(ngModel)]="presetHoraInicio" (ngModelChange)="actualizarHorarioPreestablecido()"></ion-input>
+              <ion-input label="Hora de inicio" label-placement="stacked" type="time" [(ngModel)]="presetHoraInicio" (ngModelChange)="setPresetEndTimeOneHourLater()"></ion-input>
               <ion-input label="Hora de fin" label-placement="stacked" type="time" [(ngModel)]="presetHoraFin" (ngModelChange)="actualizarHorarioPreestablecido()"></ion-input>
             </div>
             <label class="color-picker">Color <input type="color" [(ngModel)]="presetColor" /></label>
@@ -877,6 +884,7 @@
             <label class="medication-quick-field"><span>Duración <em>*</em></span><ion-select interface="popover" [(ngModel)]="medicationDurationDays">@if (medicationDurationDays !== null && !medicationDurationOptions.includes(medicationDurationDays)) {<ion-select-option [value]="medicationDurationDays">{{ medicationDurationDays }} días</ion-select-option>}@for (days of medicationDurationOptions; track days) {<ion-select-option [value]="days">{{ days }} días</ion-select-option>}<ion-select-option [value]="null">Indefinido</ion-select-option></ion-select></label>
           </div>
           <label class="medication-quick-field first-dose-field"><span>Primera toma <em>*</em></span><ion-input type="time" [(ngModel)]="medicationFirstTime"></ion-input></label>
+          <div class="medication-stock-toggle"><span><strong>Recordatorio insistente</strong><small>Suena, vibra y muestra una ventana flotante.</small></span><ion-toggle [(ngModel)]="medicationInsistentReminder"></ion-toggle></div>
           <div class="medication-stock-toggle"><span><strong>Control de existencias</strong><small>Avisa cuando quede poco medicamento</small></span><ion-toggle [(ngModel)]="medicationStockEnabled"></ion-toggle></div>
           @if (medicationStockEnabled) {
           <div class="medication-stock-editor">
@@ -1209,6 +1217,7 @@
         <section class="wallet-form">
           <ion-input label="Sueldo por quincena" label-placement="stacked" type="number" min="0" inputmode="decimal" [(ngModel)]="walletSalaryAmount"></ion-input>
           <ion-select label="Forma de pago" label-placement="stacked" [(ngModel)]="walletPaySchedule"><ion-select-option value="semi-monthly">Días 15 y fin de mes</ion-select-option><ion-select-option value="biweekly">Cada 14 días</ion-select-option></ion-select>
+          @if (walletPaySchedule === 'semi-monthly') { <ion-toggle [(ngModel)]="walletMoveWeekendPayToFriday">Pago en días hábiles</ion-toggle> }
           @if (walletPaySchedule === 'biweekly') { <ion-input label="Primera fecha de pago" label-placement="stacked" type="date" [(ngModel)]="walletFirstPayDate"></ion-input> }
           <button type="button" class="wallet-primary" (click)="guardarConfiguracionBilletera()">Guardar sueldo</button>
         </section>
@@ -1303,7 +1312,12 @@
       <ion-content class="modal-content">
         <section class="settings-labels reminder-settings battery-settings">
           <h2>Alarmas en segundo plano</h2>
-          <p>Permite que los recordatorios suenen puntualmente cuando Agenda est&aacute; cerrada o el tel&eacute;fono bloqueado.</p>
+          <p>Los avisos normales se muestran sin sonido. Activa el modo insistente solo para recibir una alarma con sonido y vibración.</p>
+
+          <div class="reminder-setting-row">
+            <span><strong>Notificaciones insistentes</strong><small>Mostrar ventana flotante con sonido y vibración</small></span>
+            <ion-toggle [checked]="insistentNotificationsEnabled" aria-label="Activar notificaciones insistentes" (ionChange)="setInsistentNotificationsEnabled($event.detail.checked)"></ion-toggle>
+          </div>
 
           <div class="battery-status" [class.protected]="batteryOptimizationStatus === 'protected'">
             <span class="battery-status-icon"><ion-icon name="battery-charging-outline"></ion-icon></span>

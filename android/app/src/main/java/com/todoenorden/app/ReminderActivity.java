@@ -27,6 +27,7 @@ public class ReminderActivity extends ComponentActivity {
     private long dueAt;
     private boolean medicationReminder;
     private boolean walletReminder;
+    private boolean insistentReminder;
 
     private final Runnable updateCountdown = new Runnable() {
         @Override
@@ -90,12 +91,13 @@ public class ReminderActivity extends ComponentActivity {
         String label = getIntent().getStringExtra("label");
         medicationReminder = "medication".equals(getIntent().getStringExtra("kind"));
         walletReminder = "wallet".equals(getIntent().getStringExtra("kind"));
+        insistentReminder = getIntent().getBooleanExtra("insistent", false);
         dueAt = getIntent().getLongExtra("dueAt", System.currentTimeMillis());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setPadding(dp(24), dp(36), dp(24), dp(28));
+        root.setPadding(dp(22), dp(22), dp(22), dp(20));
         root.setBackgroundColor(Color.rgb(9, 13, 21));
 
         TextView eyebrow = text(
@@ -112,11 +114,13 @@ public class ReminderActivity extends ComponentActivity {
                 : walletReminder
                     ? (taskTitle == null ? "Tu pago" : taskTitle) + " est\u00e1 pendiente"
                 : (taskTitle == null ? "Esta tarea" : taskTitle) + " est\u00e1 pendiente",
-            30,
+            24,
             Color.WHITE,
             Typeface.BOLD
         );
         title.setGravity(Gravity.CENTER);
+        title.setMaxLines(2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams titleParams = matchWrap();
         titleParams.topMargin = dp(18);
         root.addView(title, titleParams);
@@ -148,27 +152,49 @@ public class ReminderActivity extends ComponentActivity {
         countdownView = text("", 28, Color.rgb(96, 165, 250), Typeface.BOLD);
         countdownView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams countdownParams = matchWrap();
-        countdownParams.topMargin = dp(44);
+        countdownParams.topMargin = dp(26);
         root.addView(countdownView, countdownParams);
 
-        Space spacer = new Space(this);
-        root.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams actionsParams = matchWrap();
+        actionsParams.topMargin = dp(28);
+
+        Button openApp = new Button(this);
+        openApp.setText("Ir a la app");
+        openApp.setTextSize(16);
+        openApp.setTextColor(Color.WHITE);
+        openApp.setAllCaps(false);
+        openApp.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        GradientDrawable openBackground = new GradientDrawable();
+        openBackground.setColor(Color.TRANSPARENT);
+        openBackground.setStroke(dp(1), Color.rgb(96, 165, 250));
+        openBackground.setCornerRadius(dp(10));
+        openApp.setBackground(openBackground);
+        openApp.setOnClickListener(view -> openApp());
+        actions.addView(openApp, new LinearLayout.LayoutParams(0, dp(52), 1));
 
         Button close = new Button(this);
-        close.setText(R.string.reminder_close);
-        close.setTextSize(17);
+        close.setText("Cerrar");
+        close.setTextSize(16);
         close.setTextColor(Color.WHITE);
         close.setAllCaps(false);
         close.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        close.setMinHeight(dp(56));
+        close.setMinHeight(dp(52));
         GradientDrawable buttonBackground = new GradientDrawable();
         buttonBackground.setColor(Color.rgb(37, 99, 235));
-        buttonBackground.setCornerRadius(dp(8));
+        buttonBackground.setCornerRadius(dp(10));
         close.setBackground(buttonBackground);
         close.setOnClickListener(view -> closeReminder());
-        root.addView(close, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(0, dp(52), 1);
+        closeParams.setMargins(dp(10), 0, 0, 0);
+        actions.addView(close, closeParams);
+        root.addView(actions, actionsParams);
 
         setContentView(root);
+        getWindow().setLayout(dp(360), ViewGroup.LayoutParams.WRAP_CONTENT);
+        getWindow().setGravity(Gravity.CENTER);
     }
 
     private void renderCountdown() {
@@ -200,6 +226,13 @@ public class ReminderActivity extends ComponentActivity {
     private void closeReminder() {
         stopService(new Intent(this, ReminderAlarmService.class));
         finish();
+    }
+
+    private void openApp() {
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        closeReminder();
     }
 
     private TextView text(String value, int size, int color, int style) {

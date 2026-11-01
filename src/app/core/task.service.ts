@@ -26,6 +26,7 @@ interface TaskDraft {
   color?: string;
   prioridad: TaskPriority;
   etiqueta?: TaskLabel;
+  insistentReminder?: boolean;
   favorita?: boolean;
   repeticion?: TaskRepeat;
   parentId?: number;
@@ -264,6 +265,7 @@ export class TaskService {
         prioridad: draft.prioridad,
         estado: 'pendiente',
         etiqueta: draft.etiqueta,
+        insistentReminder: draft.insistentReminder === true,
         favorita: draft.favorita ?? false,
         repeticion: repetition,
         seriesId: repetition !== 'none' ? `serie-${id}` : undefined,
@@ -298,6 +300,7 @@ export class TaskService {
             color: this.cleanOptional(draft.color),
             prioridad: draft.prioridad,
             etiqueta: draft.etiqueta,
+            insistentReminder: draft.insistentReminder === true,
             favorita: draft.favorita ?? false,
             repeticion: repetition,
             seriesId: repetition !== 'none' ? tarea.seriesId ?? `serie-${id}` : undefined,
@@ -863,6 +866,7 @@ export class TaskService {
       prioridad: this.normalizePriority(task.prioridad),
       estado: this.normalizeStatus(task.estado),
       etiqueta: this.normalizeLabel(task.etiqueta),
+      insistentReminder: task.insistentReminder === true,
       favorita: task.favorita ?? false,
       repeticion,
       seriesId: typeof task.seriesId === 'string'

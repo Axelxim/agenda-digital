@@ -121,6 +121,7 @@ interface TreatmentMedicationDraft {
   firstTime: string;
   color: string;
   strictTracking: boolean;
+  insistentReminder: boolean;
   stockEnabled: boolean;
   stockQuantity: number;
   doseUnits: number;
@@ -266,6 +267,7 @@ export class HomePage implements OnInit, OnDestroy {
   expandedTaskId: number | null = null;
   expandedReminderLabel: TaskLabel | null = null;
   notificationSyncStatus: NotificationSyncStatus | 'idle' | 'error' = 'idle';
+  insistentNotificationsEnabled = false;
   batteryOptimizationStatus: 'checking' | 'protected' | 'restricted' | 'unavailable' = 'checking';
   batteryDeviceInfo = { manufacturer: 'Android', family: 'android' };
   calendarEditError = '';
@@ -296,6 +298,7 @@ export class HomePage implements OnInit, OnDestroy {
   medicationTimes: string[] = [];
   medicationColor = '#22c55e';
   medicationStrictTracking = false;
+  medicationInsistentReminder = false;
   medicationStockEnabled = false;
   medicationStockQuantity = 30;
   medicationDoseUnits = 1;
@@ -318,7 +321,7 @@ export class HomePage implements OnInit, OnDestroy {
   noteTitle = '';
   noteContent = '';
   walletState: WalletState = {
-    settings: { salaryAmount: 0, paySchedule: 'semi-monthly', firstPayDate: '', currency: 'MXN' },
+    settings: { salaryAmount: 0, paySchedule: 'semi-monthly', firstPayDate: '', moveWeekendPayToFriday: false, currency: 'MXN' },
     fixedExpenses: [],
     transactions: [],
   };
@@ -336,12 +339,18 @@ export class HomePage implements OnInit, OnDestroy {
   fixedExpenseFrequencyMonths: 1 | 2 = 1;
   fixedExpenseFirstDueDate = '';
   fixedExpenseReminderTime = '09:00';
+  fixedExpenseInsistentReminder = false;
+  private readonly dismissedWalletReminderKey = 'agenda_dismissed_wallet_reminders_v1';
+  private walletSwipeStartX: number | null = null;
+  walletSwipeOffset = 0;
+  walletSwipingOccurrenceId: string | null = null;
   payingFixedOccurrence: FixedExpenseOccurrence | null = null;
   fixedPaymentAmount: number | null = null;
   fixedPaymentDate = '';
   walletSalaryAmount: number | null = null;
   walletPaySchedule: 'semi-monthly' | 'biweekly' = 'semi-monthly';
   walletFirstPayDate = '';
+  walletMoveWeekendPayToFriday = false;
   returnToTreatmentManager = false;
   readonly medicationFrequencyOptions = [4, 6, 8, 12, 24];
   readonly medicationDurationOptions = [3, 4, 5, 7, 10, 14, 30];
@@ -383,6 +392,7 @@ export class HomePage implements OnInit, OnDestroy {
   routineEditorOpen = false;
   prioridad: TaskPriority = 'media';
   etiqueta: TaskLabel | undefined = undefined;
+  taskInsistentReminder = false;
   actividadMadreId: number | undefined = undefined;
   favorita = false;
   repeticion: TaskRepeat = 'none';
@@ -396,6 +406,7 @@ export class HomePage implements OnInit, OnDestroy {
   private readonly liveStateSubscriptions = new Subscription();
   private lastClockMinute = '';
   private lastStoredRefreshAt = 0;
+  private ignoreBackUntil = 0;
   private readonly storageChangeListener = () => this.refreshStoredState();
   private readonly windowFocusListener = () => this.refreshStoredState();
   private readonly visibilityChangeListener = () => {
@@ -487,6 +498,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.labelReminderSettings = this.labelReminderService.load(
       this.etiquetas.map((label) => label.nombre),
     );
+    this.insistentNotificationsEnabled = this.notificationScheduler.loadInsistentNotificationsEnabled();
     this.reminderSettingsReady = true;
     this.syncNotifications();
     void this.refreshBatteryOptimizationStatus();
@@ -637,6 +649,7 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   private async handleAndroidBack(): Promise<void> {
+    if (Date.now() < this.ignoreBackUntil) return;
     if (this.eventCancelAlertOpen) {
       this.cancelarConfirmacionEvento();
       return;
@@ -658,7 +671,9 @@ export class HomePage implements OnInit, OnDestroy {
       return;
     }
 
-    const topModal = document.querySelector<HTMLIonModalElement>('ion-modal.modal-top');
+    const topModal = document.querySelector<HTMLIonModalElement>(
+      'ion-modal.modal-top, ion-modal.show-modal',
+    );
     if (topModal) {
       if (topModal.id === 'task-editor-modal') {
         this.cerrarModal();
@@ -684,6 +699,7 @@ export class HomePage implements OnInit, OnDestroy {
         this.walletView = 'dashboard';
         return;
       }
+      this.ignoreBackUntil = Date.now() + 450;
       await topModal.dismiss();
       return;
     }
@@ -1294,6 +1310,7 @@ export class HomePage implements OnInit, OnDestroy {
       color: this.formItemType === 'evento' ? this.eventColor : undefined,
       prioridad: this.prioridad,
       etiqueta: this.etiqueta,
+      insistentReminder: this.formItemType === 'tarea' && this.taskInsistentReminder,
       favorita: this.favorita,
       repeticion: this.repeticion,
       parentId: this.formItemType === 'tarea' ? this.actividadMadreId : undefined,
@@ -1494,6 +1511,16 @@ export class HomePage implements OnInit, OnDestroy {
 
   focusEndTime(input: IonInput): void {
     window.setTimeout(() => void input.setFocus(), 0);
+  }
+
+  setEndTimeOneHourLater(input: IonInput): void {
+    if (this.nuevaHora) this.nuevaHoraFin = this.addMinutesToTime(this.nuevaHora, 60);
+    this.focusEndTime(input);
+  }
+
+  setPresetEndTimeOneHourLater(): void {
+    if (this.presetHoraInicio) this.presetHoraFin = this.addMinutesToTime(this.presetHoraInicio, 60);
+    this.actualizarHorarioPreestablecido();
   }
 
   cerrarEditorEvento(): void {
@@ -1996,7 +2023,8 @@ export class HomePage implements OnInit, OnDestroy {
       this.currentTime.getDate() + 1,
     ));
     return this.walletService.occurrences(this.currentTime, 0, 1)
-      .filter((item) => !item.paid && (item.dueDate === today || item.dueDate === tomorrow));
+      .filter((item) => !item.paid && (item.dueDate === today || item.dueDate === tomorrow))
+      .filter((item) => !this.isWalletReminderDismissedToday(item));
   }
 
   get walletPendingExpenses(): FixedExpenseOccurrence[] {
@@ -2066,6 +2094,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.fixedExpenseFrequencyMonths = expense?.frequencyMonths ?? 1;
     this.fixedExpenseFirstDueDate = expense?.firstDueDate ?? this.taskService.toISODate(this.currentTime);
     this.fixedExpenseReminderTime = expense?.reminderTime ?? '09:00';
+    this.fixedExpenseInsistentReminder = expense?.insistentReminder ?? false;
     this.walletView = 'fixed';
   }
 
@@ -2079,6 +2108,7 @@ export class HomePage implements OnInit, OnDestroy {
       frequencyMonths: this.fixedExpenseFrequencyMonths,
       firstDueDate: this.fixedExpenseFirstDueDate,
       reminderTime: this.fixedExpenseReminderTime,
+      insistentReminder: this.fixedExpenseInsistentReminder,
       active: true,
     }, this.editingFixedExpenseId ?? undefined);
     this.walletView = 'dashboard';
@@ -2093,6 +2123,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.walletSalaryAmount = this.walletState.settings.salaryAmount || null;
     this.walletPaySchedule = this.walletState.settings.paySchedule;
     this.walletFirstPayDate = this.walletState.settings.firstPayDate || this.taskService.toISODate(new Date());
+    this.walletMoveWeekendPayToFriday = this.walletState.settings.moveWeekendPayToFriday;
     this.walletView = 'settings';
   }
 
@@ -2101,6 +2132,7 @@ export class HomePage implements OnInit, OnDestroy {
       salaryAmount: Math.max(0, Number(this.walletSalaryAmount) || 0),
       paySchedule: this.walletPaySchedule,
       firstPayDate: this.walletFirstPayDate || this.taskService.toISODate(new Date()),
+      moveWeekendPayToFriday: this.walletMoveWeekendPayToFriday,
       currency: 'MXN',
     });
     this.walletView = 'dashboard';
@@ -2111,6 +2143,47 @@ export class HomePage implements OnInit, OnDestroy {
     this.fixedPaymentAmount = occurrence.expense.amount;
     this.fixedPaymentDate = this.taskService.toISODate(this.currentTime);
     this.walletView = 'payment';
+  }
+
+  startWalletReminderSwipe(event: PointerEvent): void {
+    this.walletSwipeStartX = event.clientX;
+    this.walletSwipingOccurrenceId = (event.currentTarget as HTMLElement).dataset['occurrenceId'] ?? null;
+  }
+
+  moveWalletReminderSwipe(event: PointerEvent): void {
+    if (this.walletSwipeStartX === null) return;
+    this.walletSwipeOffset = Math.max(0, Math.min(150, event.clientX - this.walletSwipeStartX));
+  }
+
+  cancelWalletReminderSwipe(): void {
+    this.walletSwipeOffset = 0;
+    this.walletSwipeStartX = null;
+    this.walletSwipingOccurrenceId = null;
+  }
+
+  endWalletReminderSwipe(event: PointerEvent, occurrence: FixedExpenseOccurrence): void {
+    if (this.walletSwipeStartX === null) return;
+    const distance = event.clientX - this.walletSwipeStartX;
+    this.walletSwipeStartX = null;
+    this.walletSwipeOffset = 0;
+    this.walletSwipingOccurrenceId = null;
+    if (distance < 80) return;
+    const dismissed = this.loadDismissedWalletReminders();
+    dismissed[occurrence.id] = this.taskService.toISODate(this.currentTime);
+    localStorage.setItem(this.dismissedWalletReminderKey, JSON.stringify(dismissed));
+    this.refreshView();
+  }
+
+  private isWalletReminderDismissedToday(occurrence: FixedExpenseOccurrence): boolean {
+    return this.loadDismissedWalletReminders()[occurrence.id] === this.taskService.toISODate(this.currentTime);
+  }
+
+  private loadDismissedWalletReminders(): Record<string, string> {
+    try {
+      return JSON.parse(localStorage.getItem(this.dismissedWalletReminderKey) ?? '{}') as Record<string, string>;
+    } catch {
+      return {};
+    }
   }
 
   guardarPagoGastoFijo(): void {
@@ -2383,6 +2456,7 @@ export class HomePage implements OnInit, OnDestroy {
       firstTime: this.medicationFirstTime,
       color: this.medicationColor,
       strictTracking: this.medicationStrictTracking,
+      insistentReminder: this.medicationInsistentReminder,
       stockEnabled: this.medicationStockEnabled,
       stockQuantity: Number(this.medicationStockQuantity),
       doseUnits: Number(this.medicationDoseUnits),
@@ -2734,6 +2808,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.medicationTimes = ['08:00'];
     this.medicationColor = '#22c55e';
     this.medicationStrictTracking = false;
+    this.medicationInsistentReminder = false;
     this.medicationStockEnabled = false;
     this.medicationStockQuantity = 30;
     this.medicationDoseUnits = 1;
@@ -2773,6 +2848,7 @@ export class HomePage implements OnInit, OnDestroy {
       times: this.calculatedMedicationTimes,
       color: this.medicationColor,
       strictTracking: this.medicationStrictTracking,
+      insistentReminder: this.medicationInsistentReminder,
       stockEnabled: this.medicationStockEnabled,
       stockQuantity: this.medicationStockQuantity,
       doseUnits: this.medicationDoseUnits,
@@ -3052,6 +3128,12 @@ export class HomePage implements OnInit, OnDestroy {
     this.updateLabelReminderSettings(label, { duePromptEnabled });
   }
 
+  setInsistentNotificationsEnabled(enabled: boolean): void {
+    this.insistentNotificationsEnabled = enabled;
+    this.notificationScheduler.saveInsistentNotificationsEnabled(enabled);
+    this.syncNotifications(enabled);
+  }
+
   setDateOnlyReminderTime(label: TaskLabel, dateOnlyTime: string | null | undefined): void {
     if (!dateOnlyTime) return;
     this.updateLabelReminderSettings(label, { dateOnlyTime });
@@ -3090,6 +3172,7 @@ export class HomePage implements OnInit, OnDestroy {
         this.medicationDoses,
         this.medicationTreatments,
         this.walletService.occurrences(this.currentTime, 0, 2),
+        this.insistentNotificationsEnabled,
       )
       .then((result) => {
         this.notificationSyncStatus = result.status;
@@ -3105,11 +3188,12 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   private async handleNotificationAction(action: ActionPerformed): Promise<void> {
-    if (!['complete', 'snooze', 'discard'].includes(action.actionId)) return;
     const taskId = Number(action.notification.extra?.taskId);
     if (!Number.isInteger(taskId)) return;
     const task = this.taskService.findById(taskId);
     if (!task || task.tipo !== 'tarea') return;
+
+    if (!['complete', 'snooze', 'discard'].includes(action.actionId)) return;
 
     if (action.actionId === 'snooze') {
       this.prepararReagenda(task);
@@ -3295,6 +3379,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.eventColor = '#2563eb';
     this.prioridad = 'media';
     this.etiqueta = undefined;
+    this.taskInsistentReminder = false;
     this.actividadMadreId = undefined;
     this.favorita = false;
     this.repeticion = 'none';
@@ -3311,6 +3396,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.eventColor = tarea.color ?? '#2563eb';
     this.prioridad = tarea.prioridad;
     this.etiqueta = tarea.etiqueta;
+    this.taskInsistentReminder = tarea.insistentReminder === true;
     this.actividadMadreId = tarea.parentId;
     this.favorita = tarea.favorita ?? false;
     this.repeticion = tarea.repeticion ?? 'none';

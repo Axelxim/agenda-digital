@@ -7,6 +7,7 @@ export interface WalletSettings {
   salaryAmount: number;
   paySchedule: WalletPaySchedule;
   firstPayDate: string;
+  moveWeekendPayToFriday: boolean;
   currency: 'MXN';
 }
 
@@ -20,6 +21,7 @@ export interface FixedExpense {
   firstDueDate: string;
   trackingStartDate: string;
   reminderTime: string;
+  insistentReminder: boolean;
   active: boolean;
   createdAt: string;
   updatedAt: string;

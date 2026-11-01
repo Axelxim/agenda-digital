@@ -75,6 +75,7 @@ public class ReminderAlarmService extends Service {
         try {
             JSONObject reminder = new JSONObject(raw);
             activeReminder = reminder;
+            boolean insistent = reminder.optBoolean("insistent", false);
             int reminderId = reminder.optInt("id");
             Log.i(TAG, "Alarm service started id=" + reminderId + " at=" + System.currentTimeMillis());
             getSharedPreferences(ACTIVE_PREFS, MODE_PRIVATE)
@@ -86,8 +87,10 @@ public class ReminderAlarmService extends Service {
             startForeground(SERVICE_NOTIFICATION_ID, buildNotification(reminder, screenIntent));
             stopAlertEffects();
             acquireWakeLock();
-            startAlarmSound();
-            startVibration();
+            if (insistent) {
+                startAlarmSound();
+                startVibration();
+            }
             openReminderScreen(screenIntent);
         } catch (Exception ignored) {
             stopSelfSafely();
@@ -192,6 +195,7 @@ public class ReminderAlarmService extends Service {
         intent.putExtra("taskTitle", reminder.optString("taskTitle"));
         intent.putExtra("label", reminder.optString("label"));
         intent.putExtra("dueAt", reminder.optLong("dueAt"));
+        intent.putExtra("insistent", reminder.optBoolean("insistent", false));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return PendingIntent.getActivity(
             this,

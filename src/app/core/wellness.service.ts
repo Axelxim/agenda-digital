@@ -16,6 +16,7 @@ export interface MedicationTreatmentDraft {
   times: string[];
   color: string;
   strictTracking: boolean;
+  insistentReminder?: boolean;
   stockEnabled?: boolean;
   stockQuantity?: number;
   doseUnits?: number;
@@ -98,6 +99,7 @@ export class WellnessService {
       schedule: { days: draft.days, times: draft.times },
       color: draft.color,
       strictTracking: draft.strictTracking,
+      insistentReminder: draft.insistentReminder === true,
       stockEnabled: draft.stockEnabled,
       stockQuantity: draft.stockQuantity,
       doseUnits: draft.doseUnits,
@@ -314,6 +316,7 @@ export class WellnessService {
       schedule: { days, times },
       color: /^#[0-9a-f]{6}$/i.test(item.color ?? '') ? item.color! : '#22c55e',
       strictTracking: item.strictTracking === true,
+      insistentReminder: item.insistentReminder === true,
       stockEnabled: item.stockEnabled === true,
       stockQuantity: this.nonNegativeNumber(item.stockQuantity, 0),
       doseUnits: this.positiveNumber(item.doseUnits, 1),

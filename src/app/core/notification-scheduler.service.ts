@@ -21,6 +21,7 @@ interface AgendaReminderPayload {
   scheduledAt: number;
   dueAt: number;
   sourceJson: string;
+  insistent: boolean;
 }
 
 interface AgendaReminderPlugin {
@@ -62,6 +63,7 @@ export class NotificationSchedulerService {
   private readonly labelReminderService = inject(LabelReminderService);
   private readonly managedIdsKey = 'agenda_scheduled_notification_ids_v1';
   private readonly lowStockNotifiedKey = 'agenda_low_stock_notified_v1';
+  private readonly insistentNotificationsKey = 'agenda_insistent_notifications_v1';
   private readonly channelId = 'agenda-reminders';
   private readonly actionTypeId = 'agenda-task-actions';
   private actionsRegistered = false;
@@ -78,6 +80,7 @@ export class NotificationSchedulerService {
     medicationDoses: MedicationDose[] = [],
     medicationTreatments: MedicationTreatment[] = [],
     walletOccurrences: FixedExpenseOccurrence[] = [],
+    insistentNotificationsEnabled = false,
   ): Promise<NotificationSyncResult> {
     const taskSnapshot = tasks.map((task) => ({ ...task }));
     const settingsSnapshot = Object.fromEntries(
@@ -106,6 +109,7 @@ export class NotificationSchedulerService {
         doseSnapshot,
         treatmentSnapshot,
         walletSnapshot,
+        insistentNotificationsEnabled,
       ));
     return this.syncQueue;
   }
@@ -121,6 +125,14 @@ export class NotificationSchedulerService {
     if (!Capacitor.isNativePlatform()) return true;
     const permission = await LocalNotifications.requestPermissions();
     return permission.display === 'granted';
+  }
+
+  loadInsistentNotificationsEnabled(): boolean {
+    return localStorage.getItem(this.insistentNotificationsKey) === 'true';
+  }
+
+  saveInsistentNotificationsEnabled(enabled: boolean): void {
+    localStorage.setItem(this.insistentNotificationsKey, String(enabled));
   }
 
   async requestBatteryOptimizationExemption(): Promise<void> {
@@ -180,6 +192,7 @@ export class NotificationSchedulerService {
     medicationDoses: MedicationDose[],
     medicationTreatments: MedicationTreatment[],
     walletOccurrences: FixedExpenseOccurrence[],
+    insistentNotificationsEnabled: boolean,
   ): Promise<NotificationSyncResult> {
     if (!Capacitor.isNativePlatform()) {
       return { status: 'web', scheduled: 0, exact: false };
@@ -234,6 +247,7 @@ export class NotificationSchedulerService {
           medicationDoses,
           medicationTreatments,
           walletOccurrences,
+          insistentNotificationsEnabled,
         )),
       });
       if (requestPermission) {
@@ -413,6 +427,7 @@ export class NotificationSchedulerService {
     medicationDoses: MedicationDose[],
     medicationTreatments: MedicationTreatment[],
     walletOccurrences: FixedExpenseOccurrence[],
+    insistentNotificationsEnabled: boolean,
   ): AgendaReminderPayload[] {
     return notifications.flatMap((notification): AgendaReminderPayload[] => {
       const walletOccurrenceId = notification.extra?.['walletOccurrenceId'];
@@ -432,6 +447,7 @@ export class NotificationSchedulerService {
           scheduledAt: scheduledAt.getTime(),
           dueAt: Number.isFinite(dueAt) ? dueAt : scheduledAt.getTime(),
           sourceJson: JSON.stringify({ id: notification.id, title: notification.title, body: notification.body, extra: notification.extra }),
+          insistent: false,
         }];
       }
 
@@ -460,6 +476,7 @@ export class NotificationSchedulerService {
           scheduledAt: scheduledAt.getTime(),
           dueAt: scheduledAt.getTime(),
           sourceJson,
+          insistent: false,
         }];
       }
 
@@ -492,6 +509,7 @@ export class NotificationSchedulerService {
         scheduledAt: scheduledAt.getTime(),
         dueAt,
         sourceJson,
+        insistent: insistentNotificationsEnabled && task.insistentReminder === true,
       }];
     });
   }

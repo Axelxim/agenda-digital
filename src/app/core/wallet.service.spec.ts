@@ -12,7 +12,7 @@ describe('WalletService', () => {
   });
 
   it('calculates salary, extra income and expenses for the current fortnight', () => {
-    service.saveSettings({ salaryAmount: 5000, paySchedule: 'semi-monthly', firstPayDate: '2026-10-01', currency: 'MXN' });
+    service.saveSettings({ salaryAmount: 5000, paySchedule: 'semi-monthly', firstPayDate: '2026-10-01', moveWeekendPayToFriday: false, currency: 'MXN' });
     service.addTransaction({ kind: 'income', description: 'Venta', amount: 500, category: 'Otros', date: '2026-10-10' });
     service.addTransaction({ kind: 'expense', description: 'Comida', amount: 300, category: 'Alimentos', date: '2026-10-11' });
 
@@ -55,7 +55,7 @@ describe('WalletService', () => {
 
   it('counts a fixed expense from the current fortnight when it is registered late', () => {
     localStorage.setItem('agenda_wallet_v1', JSON.stringify({
-      settings: { salaryAmount: 5000, paySchedule: 'semi-monthly', firstPayDate: '2026-10-01', currency: 'MXN' },
+      settings: { salaryAmount: 5000, paySchedule: 'semi-monthly', firstPayDate: '2026-10-01', moveWeekendPayToFriday: false, currency: 'MXN' },
       fixedExpenses: [{
         id: 'fuel', name: 'Gasolina', amount: 800, category: 'Transporte', dueDay: 15,
         frequencyMonths: 1, reminderTime: '09:00', active: true,
@@ -92,5 +92,23 @@ describe('WalletService', () => {
     expect(service.getState().transactions[0]).toMatchObject({
       type: 'fixed-expense', amount: 675.5, fixedPeriod: occurrences[0].period,
     });
+  });
+
+  it('starts the new pay period on Friday when a semi-monthly pay date falls on a weekend', () => {
+    service.saveSettings({
+      salaryAmount: 5000,
+      paySchedule: 'semi-monthly',
+      firstPayDate: '2026-10-01',
+      moveWeekendPayToFriday: true,
+      currency: 'MXN',
+    });
+
+    const beforePayment = service.summary(new Date('2026-10-29T12:00:00'));
+    const paidFriday = service.summary(new Date('2026-10-30T12:00:00'));
+
+    expect(beforePayment.periodStart).toBe('2026-10-15');
+    expect(beforePayment.periodEnd).toBe('2026-10-29');
+    expect(paidFriday.periodStart).toBe('2026-10-30');
+    expect(paidFriday.periodEnd).toBe('2026-11-12');
   });
 });

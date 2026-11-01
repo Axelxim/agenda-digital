@@ -88,3 +88,4 @@ h1, .calendar-header h1, .pending-view h1, .more-view h1 { margin: 0; color: var
 .agenda-task.child-task { padding: 6px 8px; border-left-width: 3px; }
 .agenda-task.child-task strong { font-size: 13px; }
 .agenda-task.child-task small { font-size: 11px; }
+.wallet-due-card { transition: transform 160ms ease; touch-action: pan-y; }

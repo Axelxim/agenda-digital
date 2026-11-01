@@ -18,6 +18,7 @@ export interface MedicationTreatment {
   schedule: MedicationSchedule;
   color: string;
   strictTracking: boolean;
+  insistentReminder: boolean;
   stockEnabled: boolean;
   stockQuantity: number;
   doseUnits: number;

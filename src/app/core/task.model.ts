@@ -47,6 +47,8 @@ export interface Task {
   prioridad: TaskPriority;
   estado: TaskStatus;
   etiqueta?: TaskLabel;
+  /** Si está activa, este pendiente usa sonido, vibración y ventana flotante. */
+  insistentReminder?: boolean;
   favorita?: boolean;
   repeticion?: TaskRepeat;
   /** Identifica los eventos ya materializados que pertenecen a una misma serie. */

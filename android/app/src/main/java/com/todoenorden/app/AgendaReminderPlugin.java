@@ -312,6 +312,7 @@ public class AgendaReminderPlugin extends Plugin {
             showIntent.putExtra("taskTitle", reminder.optString("taskTitle"));
             showIntent.putExtra("label", reminder.optString("label"));
             showIntent.putExtra("dueAt", reminder.optLong("dueAt"));
+            showIntent.putExtra("insistent", reminder.optBoolean("insistent", false));
             showIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             PendingIntent showPendingIntent = PendingIntent.getActivity(
                 context,

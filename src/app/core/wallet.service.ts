@@ -82,6 +82,7 @@ export class WalletService {
       firstDueDate,
       trackingStartDate,
       reminderTime: /^([01]\d|2[0-3]):[0-5]\d$/.test(draft.reminderTime) ? draft.reminderTime : '09:00',
+      insistentReminder: draft.insistentReminder === true,
       active: draft.active !== false,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
@@ -220,26 +221,37 @@ export class WalletService {
       endDate.setDate(startDate.getDate() + 13);
       return { start: this.toISODate(startDate), end: this.toISODate(endDate) };
     }
-    const year = reference.getFullYear();
-    const month = reference.getMonth();
-    const currentDay = reference.getDate();
-    const lastDay = new Date(year, month + 1, 0).getDate();
-    if (currentDay >= 15 && currentDay < lastDay) {
-      return {
-        start: this.toISODate(new Date(year, month, 15)),
-        end: this.toISODate(new Date(year, month, lastDay - 1)),
-      };
+    const current = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate(), 12);
+    const payDates = this.semiMonthlyPayDates(current, settings.moveWeekendPayToFriday);
+    let currentIndex = 0;
+    for (let index = 1; index < payDates.length; index += 1) {
+      if (payDates[index].getTime() > current.getTime()) break;
+      currentIndex = index;
     }
-    if (currentDay === lastDay) {
-      return {
-        start: this.toISODate(new Date(year, month, lastDay)),
-        end: this.toISODate(new Date(year, month + 1, 14)),
-      };
+    const startDate = payDates[Math.max(0, currentIndex)];
+    const nextPayDate = payDates[Math.min(payDates.length - 1, Math.max(0, currentIndex + 1))];
+    const endDate = new Date(nextPayDate);
+    endDate.setDate(endDate.getDate() - 1);
+    return { start: this.toISODate(startDate), end: this.toISODate(endDate) };
+  }
+
+  private semiMonthlyPayDates(reference: Date, moveWeekendPayToFriday: boolean): Date[] {
+    const dates: Date[] = [];
+    for (let year = reference.getFullYear() - 1; year <= reference.getFullYear() + 1; year += 1) {
+      for (let month = 0; month < 12; month += 1) {
+        dates.push(this.adjustPayDate(new Date(year, month, 15, 12), moveWeekendPayToFriday));
+        dates.push(this.adjustPayDate(new Date(year, month + 1, 0, 12), moveWeekendPayToFriday));
+      }
     }
-    return {
-      start: this.toISODate(new Date(year, month, 0)),
-      end: this.toISODate(new Date(year, month, 14)),
-    };
+    return dates.sort((left, right) => left.getTime() - right.getTime());
+  }
+
+  private adjustPayDate(date: Date, moveWeekendPayToFriday: boolean): Date {
+    const adjusted = new Date(date);
+    if (!moveWeekendPayToFriday) return adjusted;
+    if (adjusted.getDay() === 6) adjusted.setDate(adjusted.getDate() - 1);
+    if (adjusted.getDay() === 0) adjusted.setDate(adjusted.getDate() - 2);
+    return adjusted;
   }
 
   private normalizeState(value: Partial<WalletState>): WalletState {
@@ -260,6 +272,7 @@ export class WalletService {
       salaryAmount: this.amount(value?.salaryAmount),
       paySchedule: value?.paySchedule === 'biweekly' ? 'biweekly' : 'semi-monthly',
       firstPayDate: value?.firstPayDate || this.toISODate(new Date()),
+      moveWeekendPayToFriday: value?.moveWeekendPayToFriday === true,
       currency: 'MXN',
     };
   }
@@ -281,6 +294,7 @@ export class WalletService {
         : this.dateWithDay(trackingStartDate, dueDay),
       trackingStartDate,
       reminderTime: value.reminderTime || '09:00',
+      insistentReminder: value.insistentReminder === true,
       active: value.active !== false,
       createdAt,
       updatedAt: value.updatedAt || now,
