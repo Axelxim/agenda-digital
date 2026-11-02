@@ -17,6 +17,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,8 +39,31 @@ public class DeviceCalendarPlugin extends Plugin {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private ContentObserver calendarObserver;
 
+    /** Invoca la solicitud runtime de Android; el cuadro mostrado es del sistema. */
+    @PluginMethod
+    public void requestCalendarPermissions(PluginCall call) {
+        if (hasReadPermission() && hasWritePermission()) {
+            resolvePermissionState(call);
+            return;
+        }
+        requestPermissionForAliases(
+            new String[] { "readCalendar", "writeCalendar" },
+            call,
+            "calendarPermissionsCallback"
+        );
+    }
+
+    @PermissionCallback
+    private void calendarPermissionsCallback(PluginCall call) {
+        resolvePermissionState(call);
+    }
+
     @PluginMethod
     public void listCalendars(PluginCall call) {
+        if (!hasReadPermission()) {
+            call.reject("No se concedió acceso al calendario");
+            return;
+        }
         JSArray calendars = new JSArray();
         String[] projection = {
             CalendarContract.Calendars._ID,
@@ -80,6 +104,10 @@ public class DeviceCalendarPlugin extends Plugin {
 
     @PluginMethod
     public void listEvents(PluginCall call) {
+        if (!hasReadPermission()) {
+            call.reject("No se concedió acceso al calendario");
+            return;
+        }
         Long start = call.getLong("start");
         Long end = call.getLong("end");
         JSArray requestedIds = call.getArray("calendarIds");
@@ -332,6 +360,10 @@ public class DeviceCalendarPlugin extends Plugin {
 
     @PluginMethod
     public void startObserving(PluginCall call) {
+        if (!hasReadPermission()) {
+            call.reject("No se concedió acceso al calendario");
+            return;
+        }
         if (calendarObserver == null) {
             calendarObserver = new ContentObserver(new Handler(Looper.getMainLooper())) {
                 @Override
@@ -377,9 +409,33 @@ public class DeviceCalendarPlugin extends Plugin {
     }
 
     private boolean canWrite(PluginCall call) {
-        if (getPermissionState("writeCalendar") == PermissionState.GRANTED) return true;
+        if (hasWritePermission()) return true;
         call.reject("No se concedió permiso para modificar el calendario");
         return false;
+    }
+
+    private boolean hasReadPermission() {
+        return getPermissionState("readCalendar") == PermissionState.GRANTED;
+    }
+
+    private boolean hasWritePermission() {
+        return getPermissionState("writeCalendar") == PermissionState.GRANTED;
+    }
+
+    private void resolvePermissionState(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("readCalendar", permissionName(getPermissionState("readCalendar")));
+        result.put("writeCalendar", permissionName(getPermissionState("writeCalendar")));
+        call.resolve(result);
+    }
+
+    private String permissionName(PermissionState state) {
+        switch (state) {
+            case GRANTED: return "granted";
+            case PROMPT: return "prompt";
+            case PROMPT_WITH_RATIONALE: return "prompt-with-rationale";
+            default: return "denied";
+        }
     }
 
     private String valueOrDefault(String value, String fallback) {

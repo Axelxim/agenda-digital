@@ -66,6 +66,7 @@ export function deduplicateCalendarEvents<
 interface DeviceCalendarPlugin {
   checkPermissions(): Promise<{ readCalendar: PermissionState; writeCalendar: PermissionState }>;
   requestPermissions(): Promise<{ readCalendar: PermissionState; writeCalendar: PermissionState }>;
+  requestCalendarPermissions(): Promise<{ readCalendar: PermissionState; writeCalendar: PermissionState }>;
   listCalendars(): Promise<{ calendars: DeviceCalendar[] }>;
   listEvents(options: { start: number; end: number; calendarIds: string[] }): Promise<{ events: NativeCalendarEvent[] }>;
   updateEvent(options: {
@@ -135,12 +136,20 @@ export class DeviceCalendarService {
     }
   }
 
-  async requestInitialPermissions(): Promise<void> {
-    if (!this.supported) return;
+  /** Solicita el cuadro de diálogo real de Android una sola vez desde el arranque. */
+  async requestInitialPermissions(): Promise<boolean> {
+    if (!this.supported) return false;
     try {
-      await DeviceCalendarNative.requestPermissions();
+      const permission = await DeviceCalendarNative.checkPermissions();
+      if (permission.readCalendar === 'granted') return true;
+      // "denied" puede significar que Android ya no debe volver a mostrar el diálogo.
+      if (permission.readCalendar === 'denied') return false;
+
+      const requested = await DeviceCalendarNative.requestCalendarPermissions();
+      return requested.readCalendar === 'granted';
     } catch (error) {
       console.warn('No fue posible solicitar los permisos de calendario.', error);
+      return false;
     }
   }
 
@@ -156,7 +165,7 @@ export class DeviceCalendarService {
 
     let permission = await DeviceCalendarNative.checkPermissions();
     if (permission.readCalendar !== 'granted' && requestPermission) {
-      permission = await DeviceCalendarNative.requestPermissions();
+      permission = await DeviceCalendarNative.requestCalendarPermissions();
     }
     if (permission.readCalendar !== 'granted') return { status: 'denied', calendars: [] };
 
@@ -239,15 +248,23 @@ export class DeviceCalendarService {
 
   async observeChanges(listener: () => void): Promise<PluginListenerHandle | undefined> {
     if (!this.supported) return undefined;
-    const handle = await DeviceCalendarNative.addListener('calendarChanged', listener);
-    await DeviceCalendarNative.startObserving();
-    return handle;
+    try {
+      const permission = await DeviceCalendarNative.checkPermissions();
+      if (permission.readCalendar !== 'granted') return undefined;
+
+      const handle = await DeviceCalendarNative.addListener('calendarChanged', listener);
+      await DeviceCalendarNative.startObserving();
+      return handle;
+    } catch (error) {
+      console.warn('No fue posible observar cambios del calendario.', error);
+      return undefined;
+    }
   }
 
   private async requireWritePermission(): Promise<void> {
     let permission = await DeviceCalendarNative.checkPermissions();
     if (permission.writeCalendar !== 'granted') {
-      permission = await DeviceCalendarNative.requestPermissions();
+      permission = await DeviceCalendarNative.requestCalendarPermissions();
     }
     if (permission.writeCalendar !== 'granted') {
       throw new Error('Se necesita permiso para modificar el calendario');

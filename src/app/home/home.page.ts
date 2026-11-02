@@ -470,6 +470,7 @@ export class HomePage implements OnInit, OnDestroy {
   private readonly fabPositionKey = 'home-fab-position';
   private readonly advancedModeKey = 'agenda-advanced-mode';
   private readonly initialPermissionKey = 'agenda-native-permissions-v1';
+  private readonly initialCalendarPermissionKey = 'agenda-calendar-permission-requested-v1';
   private fabDrag?: {
     pointerId: number;
     startX: number;
@@ -3214,17 +3215,46 @@ export class HomePage implements OnInit, OnDestroy {
   }
 
   private async requestInitialAndroidPermissions(): Promise<void> {
-    if (Capacitor.getPlatform() !== 'android' || localStorage.getItem(this.initialPermissionKey) === 'done') return;
-    localStorage.setItem(this.initialPermissionKey, 'done');
+    if (Capacitor.getPlatform() !== 'android') return;
 
-    try {
-      const notificationsGranted = await this.notificationScheduler.requestNotificationPermission();
-      if (notificationsGranted) this.syncNotifications();
-    } catch (error) {
-      console.warn('No fue posible solicitar el permiso de notificaciones.', error);
+    if (localStorage.getItem(this.initialPermissionKey) !== 'done') {
+      localStorage.setItem(this.initialPermissionKey, 'done');
+      try {
+        const notificationsGranted = await this.notificationScheduler.requestNotificationPermission();
+        if (notificationsGranted) this.syncNotifications();
+      } catch (error) {
+        console.warn('No fue posible solicitar el permiso de notificaciones.', error);
+      }
     }
 
-    await this.deviceCalendarService.requestInitialPermissions();
+    if (localStorage.getItem(this.initialCalendarPermissionKey) === 'done') return;
+    // Se marca antes de abrir el diálogo para evitar solicitudes duplicadas durante este inicio.
+    localStorage.setItem(this.initialCalendarPermissionKey, 'done');
+    const granted = await this.deviceCalendarService.requestInitialPermissions();
+    if (!granted) {
+      this.deviceCalendarStatus = 'denied';
+      this.refreshView();
+      return;
+    }
+
+    this.deviceCalendarSettings = { ...this.deviceCalendarSettings, enabled: true };
+    await this.loadDeviceCalendars(false);
+    if (this.deviceCalendarStatus !== 'ready') return;
+    if (!this.deviceCalendarSettings.selectionConfigured) {
+      this.deviceCalendarSettings = {
+        ...this.deviceCalendarSettings,
+        selectedCalendarIds: this.deviceCalendars.map((calendar) => calendar.id),
+        selectionConfigured: true,
+      };
+    }
+    this.deviceCalendarService.saveSettings(this.deviceCalendarSettings);
+    await this.refreshDeviceCalendarEvents();
+    void this.deviceCalendarService.observeChanges(() => {
+      if (this.calendarRefreshTimer) clearTimeout(this.calendarRefreshTimer);
+      this.calendarRefreshTimer = setTimeout(() => this.refreshDeviceCalendarEvents(), 500);
+    }).then((listener) => {
+      this.calendarChangeListener = listener;
+    });
   }
 
   async abrirConfiguracionBateria(): Promise<void> {

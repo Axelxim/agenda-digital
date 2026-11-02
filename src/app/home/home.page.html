@@ -1520,6 +1520,7 @@
           } @else if (deviceCalendarStatus === 'denied') {
           <p>Se necesita permiso para leer el calendario del dispositivo.</p>
           <ion-button expand="block" fill="outline" (click)="setDeviceCalendarEnabled(true)">Conceder permiso</ion-button>
+          <ion-button expand="block" fill="clear" (click)="abrirAjustesAplicacion()">Abrir ajustes de la aplicación</ion-button>
           } @else if (deviceCalendarStatus === 'unavailable') {
           <p>Esta integración está disponible al ejecutar la aplicación en Android.</p>
           } @else if (deviceCalendarStatus === 'error') {
