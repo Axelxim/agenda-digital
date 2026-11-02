@@ -266,12 +266,40 @@ export class NotificationSchedulerService {
     settings: Record<TaskLabel, LabelReminderSettings>,
     now = new Date(),
   ): LocalNotificationSchema[] {
-    return tasks.flatMap((task) => {
-      if (task.tipo !== 'tarea' || !task.etiqueta) return [];
-      const labelSettings = settings[task.etiqueta];
-      if (!labelSettings) return [];
+    return tasks.flatMap((task): LocalNotificationSchema[] => {
+      if (task.tipo === 'evento') {
+        if (!task.fecha || !task.hora || typeof task.eventReminderMinutes !== 'number') return [];
+        const eventAt = new Date(`${task.fecha}T${task.hora}:00`);
+        const scheduledAt = new Date(eventAt.getTime() - task.eventReminderMinutes * 60_000);
+        if (Number.isNaN(eventAt.getTime()) || scheduledAt.getTime() < now.getTime()) return [];
+        return [{
+          id: this.notificationId(task.id, `event-${task.eventReminderMinutes}`),
+          title: `Recordatorio: ${task.titulo}`,
+          body: task.eventReminderMinutes === 0
+            ? 'Tu evento comienza ahora.'
+            : `Tu evento comienza en ${this.eventLeadLabel(task.eventReminderMinutes)}.`,
+          schedule: { at: scheduledAt, allowWhileIdle: true },
+          channelId: this.channelId,
+          actionTypeId: this.actionTypeId,
+          foreground: true,
+          extra: {
+            taskId: task.id,
+            taskUuid: task.uuid,
+            reminderType: 'event',
+            offsetMinutes: task.eventReminderMinutes,
+          },
+        } satisfies LocalNotificationSchema];
+      }
 
-      return this.labelReminderService.calculateSchedule(task, labelSettings, now).map((reminder) => {
+      if (task.tipo !== 'tarea') return [];
+      const individualReminder = this.taskReminderNotification(task, now);
+      if (!task.etiqueta) return individualReminder ? [individualReminder] : [];
+      const labelSettings = settings[task.etiqueta];
+      if (!labelSettings) return individualReminder ? [individualReminder] : [];
+
+      return [
+        ...(individualReminder ? [individualReminder] : []),
+        ...this.labelReminderService.calculateSchedule(task, labelSettings, now).map((reminder) => {
         const isDuePrompt = reminder.type === 'due-prompt';
         return {
           id: this.notificationId(task.id, isDuePrompt ? 'due' : String(reminder.offsetMinutes)),
@@ -290,7 +318,8 @@ export class NotificationSchedulerService {
             offsetMinutes: reminder.offsetMinutes,
           },
         } satisfies LocalNotificationSchema;
-      });
+        }),
+      ];
     });
   }
 
@@ -379,6 +408,7 @@ export class NotificationSchedulerService {
     if (!Capacitor.isNativePlatform()) return;
     const ids = [
       this.notificationId(taskId, 'due'),
+      this.notificationId(taskId, 'individual-reminder'),
       ...this.labelReminderService.leadOptions.map((option) =>
         this.notificationId(taskId, String(option.minutes)),
       ),
@@ -483,9 +513,31 @@ export class NotificationSchedulerService {
       const taskId = Number(notification.extra?.['taskId']);
       const task = tasks.find((item) => item.id === taskId);
       const scheduledAt = notification.schedule?.at;
-      if (!task?.fecha || !task.etiqueta || !(scheduledAt instanceof Date)) return [];
+      if (!task || !(scheduledAt instanceof Date)) return [];
 
-      const dueTime = task.hora || settings[task.etiqueta]?.dateOnlyTime;
+      const isIndividualReminder = notification.extra?.['reminderType'] === 'task-reminder';
+      if (isIndividualReminder) {
+        return [{
+          id: notification.id,
+          taskId,
+          kind: 'task',
+          taskTitle: task.titulo,
+          label: task.etiqueta ?? 'Tarea',
+          title: notification.title,
+          body: notification.body,
+          scheduledAt: scheduledAt.getTime(),
+          dueAt: scheduledAt.getTime(),
+          sourceJson: JSON.stringify({ id: notification.id, title: notification.title, body: notification.body, extra: notification.extra }),
+          insistent: insistentNotificationsEnabled && (
+            task.insistentReminder === true ||
+            (task.etiqueta ? settings[task.etiqueta]?.insistentEnabled === true : false)
+          ),
+        }];
+      }
+
+      if (!task.fecha) return [];
+
+      const dueTime = task.hora || (task.etiqueta ? settings[task.etiqueta]?.dateOnlyTime : undefined);
       if (!dueTime) return [];
       const dueAt = new Date(`${task.fecha}T${dueTime}:00`).getTime();
       if (Number.isNaN(dueAt)) return [];
@@ -503,13 +555,16 @@ export class NotificationSchedulerService {
         taskId,
         kind: 'task',
         taskTitle: task.titulo,
-        label: task.etiqueta,
+        label: task.etiqueta ?? 'Evento',
         title: notification.title,
         body: notification.body,
         scheduledAt: scheduledAt.getTime(),
         dueAt,
         sourceJson,
-        insistent: insistentNotificationsEnabled && task.insistentReminder === true,
+        insistent: insistentNotificationsEnabled && (
+          task.insistentReminder === true ||
+          (task.etiqueta ? settings[task.etiqueta]?.insistentEnabled === true : false)
+        ),
       }];
     });
   }
@@ -518,6 +573,29 @@ export class NotificationSchedulerService {
     return this.labelReminderService.leadOptions.find(
       (option) => option.minutes === minutes,
     )?.label ?? 'poco tiempo';
+  }
+
+  private eventLeadLabel(minutes: number): string {
+    if (minutes === 60) return '1 hora';
+    if (minutes === 120) return '2 horas';
+    if (minutes === 1440) return '1 día';
+    return `${minutes} minutos`;
+  }
+
+  private taskReminderNotification(task: Task, now: Date): LocalNotificationSchema | undefined {
+    if (!task.reminderDate || !task.reminderTime || task.estado !== 'pendiente') return undefined;
+    const scheduledAt = new Date(`${task.reminderDate}T${task.reminderTime}:00`);
+    if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() < now.getTime()) return undefined;
+    return {
+      id: this.notificationId(task.id, 'individual-reminder'),
+      title: `Recordatorio: ${task.titulo}`,
+      body: 'Tienes esta tarea pendiente.',
+      schedule: { at: scheduledAt, allowWhileIdle: true },
+      channelId: this.channelId,
+      actionTypeId: this.actionTypeId,
+      foreground: true,
+      extra: { taskId: task.id, taskUuid: task.uuid, reminderType: 'task-reminder' },
+    } satisfies LocalNotificationSchema;
   }
 
   private money(value: number): string {

@@ -21,6 +21,7 @@ export interface TaskSubtask {
 export interface LabelReminderSettings {
   label: TaskLabel;
   enabled: boolean;
+  insistentEnabled: boolean;
   advanceMinutes: ReminderLeadMinutes[];
   duePromptEnabled: boolean;
   dateOnlyTime: string;
@@ -49,6 +50,11 @@ export interface Task {
   etiqueta?: TaskLabel;
   /** Si está activa, este pendiente usa sonido, vibración y ventana flotante. */
   insistentReminder?: boolean;
+  /** Aviso individual opcional, incluso para tareas sin fecha de entrega. */
+  reminderDate?: string;
+  reminderTime?: string;
+  /** Minutos antes del inicio en que se avisa de un evento. */
+  eventReminderMinutes?: number;
   favorita?: boolean;
   repeticion?: TaskRepeat;
   /** Identifica los eventos ya materializados que pertenecen a una misma serie. */

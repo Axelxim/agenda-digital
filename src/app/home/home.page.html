@@ -26,12 +26,32 @@
         <span><strong>Modo avanzado</strong><small>Subtareas y planificación detallada</small></span>
         <ion-toggle [checked]="advancedModeEnabled" aria-label="Activar modo avanzado" (ionChange)="setAdvancedModeEnabled($event.detail.checked)"></ion-toggle>
       </div>
+      <div class="settings-side-toggle">
+        <span class="settings-side-icon"><ion-icon name="heart-outline"></ion-icon></span>
+        <span><strong>Mi autocuidado</strong><small>Hábitos pequeños y modo poca energía</small></span>
+        <ion-toggle [checked]="selfCareState.enabled" aria-label="Activar Mi autocuidado" (ionChange)="setSelfCareEnabled($event.detail.checked)"></ion-toggle>
+      </div>
     </nav>
   </ion-content>
 </ion-menu>
 
+<ion-menu menuId="main-menu" contentId="agenda-content" side="start" type="overlay" [swipeGesture]="true" class="settings-side-menu main-side-menu">
+  <ion-header><ion-toolbar><ion-title>Todo en Orden</ion-title><ion-buttons slot="end"><ion-button fill="clear" aria-label="Cerrar menú" (click)="cerrarMenuPrincipal()"><ion-icon name="close"></ion-icon></ion-button></ion-buttons></ion-toolbar></ion-header>
+  <ion-content><nav class="settings-side-nav" aria-label="Menú principal">
+    <p>Organización</p>
+    <button type="button" (click)="abrirBuscadorDesdeMenu()"><span class="settings-side-icon"><ion-icon name="search-outline"></ion-icon></span><span><strong>Buscar en Agenda</strong><small>Tareas, eventos y tratamientos</small></span><ion-icon name="chevron-forward-outline"></ion-icon></button>
+    <button type="button" (click)="abrirNotasDesdeMenu()"><span class="settings-side-icon"><ion-icon name="document-text-outline"></ion-icon></span><span><strong>Notas rápidas</strong><small>{{ quickNotes.length }} guardadas</small></span><ion-icon name="chevron-forward-outline"></ion-icon></button>
+    <button type="button" (click)="abrirBilleteraDesdeMenu()"><span class="settings-side-icon"><ion-icon name="wallet-outline"></ion-icon></span><span><strong>Billetera</strong><small>{{ walletMoney(walletSummary.available) }} disponibles</small></span><ion-icon name="chevron-forward-outline"></ion-icon></button>
+    <p>Rutinas y bienestar</p>
+    <button type="button" (click)="abrirRutinasDesdeMenu()"><span class="settings-side-icon"><ion-icon name="repeat-outline"></ion-icon></span><span><strong>Rutinas</strong><small>{{ preestablecidos.length }} guardadas</small></span><ion-icon name="chevron-forward-outline"></ion-icon></button>
+    <button type="button" (click)="abrirEtiquetasDesdeMenu()"><span class="settings-side-icon"><ion-icon name="pricetag-outline"></ion-icon></span><span><strong>Etiquetas y recordatorios</strong><small>Configurar avisos</small></span><ion-icon name="chevron-forward-outline"></ion-icon></button>
+    <button type="button" (click)="abrirTratamientosDesdeMenu()"><span class="settings-side-icon wellness"><ion-icon name="medical-outline"></ion-icon></span><span><strong>Mis tratamientos</strong><small>{{ treatmentGroups.length }} registrados</small></span><ion-icon name="chevron-forward-outline"></ion-icon></button>
+  </nav></ion-content>
+</ion-menu>
+
 <ion-header class="app-header" [class.editor-open]="eventEditorOpen || birthdayEditorOpen" [translucent]="true">
   <ion-toolbar>
+    <ion-buttons slot="start"><ion-button fill="clear" aria-label="Abrir menú" (click)="abrirMenuPrincipal()"><ion-icon name="menu-outline"></ion-icon></ion-button></ion-buttons>
     <ion-title>{{ titulo }}</ion-title>
     <ion-buttons slot="end">
       <ion-button fill="clear" [attr.aria-label]="notificationButtonLabel()" (click)="activateNotifications()">
@@ -422,6 +442,28 @@
     </section>
     }
 
+    @if (selectedView === 'cuidado' && selfCareState.enabled) {
+    <section class="self-care-view">
+      <header class="self-care-hero"><span class="self-care-heart">♡</span><div><h1>Mi autocuidado</h1><p>Pequeños hábitos que me ayudan a sentirme mejor, un día a la vez.</p></div></header>
+      <section class="self-care-progress">
+        <button type="button" class="self-care-history-button" (click)="selfCareHistoryOpen = true" aria-label="Ver historial de hoy"><ion-icon name="time-outline"></ion-icon></button>
+        <div class="self-care-ring" [style.--progress]="selfCareProgress + '%'"><span>{{ selfCareProgress }}%</span></div>
+        <div><strong>Progreso de hoy</strong><b>{{ selfCareCompletedCount }} de {{ selfCareTotalCount }}</b><small>{{ selfCareProgress >= 70 ? '¡Vas muy bien!' : 'Un paso a la vez.' }}</small></div>
+      </section>
+      <div class="self-care-tabs"><button [class.active]="selfCareFilter === 'daily'" (click)="setSelfCareFilter('daily')">Rutina diaria</button><button [class.active]="selfCareFilter === 'morning'" (click)="setSelfCareFilter('morning')">Mañana</button><button [class.active]="selfCareFilter === 'night'" (click)="setSelfCareFilter('night')">Noche</button><button [class.active]="selfCareFilter === 'mine'" (click)="setSelfCareFilter('mine')">Mis hábitos</button></div>
+      <div class="self-care-list">
+        @for (entry of selfCareActiveEntries; track entry.habit.id + entry.timeKey) {
+        <article class="self-care-card" [class.completed]="entry.completed" [style.--care-color]="entry.habit.color"><span class="self-care-icon">{{ entry.habit.icon }}</span><button type="button" class="self-care-main" (click)="openSelfCareEditor(entry.habit)"><strong>{{ entry.habit.name }}</strong><small>{{ entry.timeKey }}</small></button><ion-checkbox [checked]="entry.completed" (ionChange)="toggleSelfCareEntry(entry.habit, entry.timeKey)" [attr.aria-label]="'Completar ' + entry.habit.name"></ion-checkbox></article>
+        }
+        @for (dose of selfCareActiveMedicationEntries; track dose.id) {
+        <article class="self-care-card medication" [class.completed]="dose.status === 'taken'"><span class="self-care-icon">💊</span><span class="self-care-main"><strong>{{ selfCareMedicationName(dose) }}</strong><small>{{ dose.scheduledAt.slice(11, 16) }} · Medicamento</small></span><ion-checkbox [checked]="dose.status === 'taken'" (ionChange)="toggleMedicationDose(dose)" [attr.aria-label]="'Registrar toma de ' + selfCareMedicationName(dose)"></ion-checkbox></article>
+        }
+        @if (selfCareActiveEntries.length === 0 && selfCareActiveMedicationEntries.length === 0) { <p class="self-care-empty">Por ahora no tienes más pendientes. Un paso a la vez.</p> }
+      </div>
+      <div class="self-care-actions"><button type="button" class="self-care-add" (click)="openSelfCareEditor()">＋ Agregar hábito</button><button type="button" class="self-care-energy" [class.active]="selfCareState.lowEnergy" (click)="setLowEnergyMode(!selfCareState.lowEnergy)">⚡ {{ selfCareState.lowEnergy ? 'Ver todos' : 'Hoy tengo poca energía' }}</button></div>
+    </section>
+    }
+
     @if (selectedView === 'mas') {
     <section class="more-view">
       <h1>Más</h1>
@@ -501,6 +543,22 @@
         </label>
       </div>
       @if (timeRangeInvalid) { <p class="time-validation">La hora de fin debe ser posterior a la de inicio.</p> }
+
+      @if (!editingExternalEvent && !willSaveEventToDeviceCalendar) {
+      <ion-select
+        class="editor-field"
+        label="Aviso del evento"
+        label-placement="stacked"
+        placeholder="Sin aviso"
+        [(ngModel)]="eventReminderMinutes"
+      >
+        <ion-select-option [value]="null">Sin aviso</ion-select-option>
+        @for (option of eventReminderOptions; track option.minutes) {
+        <ion-select-option [value]="option.minutes">{{ option.label }}</ion-select-option>
+        }
+      </ion-select>
+      <p class="task-optional-time-label">Recibirás una notificación normal antes del evento.</p>
+      }
 
       @if (!editingExternalEvent) {
       <button type="button" class="editor-field editor-repeat" (click)="eventRepeatExpanded = !eventRepeatExpanded" [attr.aria-expanded]="eventRepeatExpanded">
@@ -593,6 +651,7 @@
       <ion-fab-button aria-label="Crear medicamento" (click)="nuevoMedicamentoDesdeFab()"><ion-icon name="medical-outline"></ion-icon></ion-fab-button>
       }
       <ion-fab-button aria-label="Registrar gasto" (click)="nuevoGastoDesdeFab()"><ion-icon name="wallet-outline"></ion-icon></ion-fab-button>
+      <ion-fab-button aria-label="Registrar ingreso" (click)="nuevoIngresoDesdeFab()"><ion-icon name="cash-outline"></ion-icon></ion-fab-button>
     </ion-fab-list>
   </ion-fab>
   }
@@ -713,6 +772,21 @@
           }
           }
 
+          @if (formItemType === 'evento') {
+          <ion-select
+            label="Aviso del evento"
+            label-placement="stacked"
+            placeholder="Sin aviso"
+            [(ngModel)]="eventReminderMinutes"
+          >
+            <ion-select-option [value]="null">Sin aviso</ion-select-option>
+            @for (option of eventReminderOptions; track option.minutes) {
+            <ion-select-option [value]="option.minutes">{{ option.label }}</ion-select-option>
+            }
+          </ion-select>
+          <p class="task-optional-time-label">Recibirás una notificación normal antes del evento.</p>
+          }
+
           @if (formMode !== 'reschedule') {
           @if (formItemType === 'tarea') {
           <ion-select
@@ -776,14 +850,25 @@
             <ion-select-option value="monthly">Mensual</ion-select-option>
           </ion-select>
 
-          @if (taskScheduleEnabled) {
+          }
+
+          }
+
+          @if (formItemType === 'tarea') {
           <div class="task-schedule-option">
-            <span><strong>Recordatorio insistente</strong><small>Suena, vibra y muestra una ventana flotante a la hora programada.</small></span>
+            <span><strong>Recordatorio</strong><small>Avísame en una fecha y hora elegidas.</small></span>
+            <ion-toggle [checked]="taskReminderEnabled" (ionChange)="setTaskReminderEnabled($event.detail.checked)" aria-label="Activar recordatorio"></ion-toggle>
+          </div>
+          @if (taskReminderEnabled) {
+          <div class="time-range">
+            <ion-input label="Fecha del aviso" label-placement="stacked" type="date" [(ngModel)]="taskReminderDate"></ion-input>
+            <ion-input label="Hora del aviso" label-placement="stacked" type="time" [(ngModel)]="taskReminderTime"></ion-input>
+          </div>
+          <div class="task-schedule-option">
+            <span><strong>Recordatorio insistente</strong><small>Suena, vibra y muestra una ventana flotante.</small></span>
             <ion-toggle [(ngModel)]="taskInsistentReminder" aria-label="Activar recordatorio insistente"></ion-toggle>
           </div>
           }
-          }
-
           }
 
           <div class="form-actions">
@@ -888,10 +973,10 @@
           <div class="medication-stock-toggle"><span><strong>Control de existencias</strong><small>Avisa cuando quede poco medicamento</small></span><ion-toggle [(ngModel)]="medicationStockEnabled"></ion-toggle></div>
           @if (medicationStockEnabled) {
           <div class="medication-stock-editor">
-            <label class="medication-quick-field"><span>Cantidad disponible</span><ion-input type="number" min="0" inputmode="decimal" [(ngModel)]="medicationStockQuantity"></ion-input></label>
+            <label class="medication-quick-field"><span>Cantidad disponible</span><ion-input type="text" inputmode="decimal" [(ngModel)]="medicationStockQuantity"></ion-input></label>
             <label class="medication-quick-field"><span>Unidad</span><ion-select interface="popover" [(ngModel)]="medicationStockUnit">@for (unit of medicationStockUnits; track unit) {<ion-select-option [value]="unit">{{ unit }}</ion-select-option>}</ion-select></label>
-            <label class="medication-quick-field"><span>Por cada toma</span><ion-input type="number" min="0.1" step="0.5" inputmode="decimal" [(ngModel)]="medicationDoseUnits"></ion-input></label>
-            <label class="medication-quick-field"><span>Avisar al quedar</span><ion-input type="number" min="0" inputmode="decimal" [(ngModel)]="medicationLowStockThreshold"></ion-input></label>
+            <label class="medication-quick-field"><span>Por cada toma</span><ion-input type="text" inputmode="decimal" [(ngModel)]="medicationDoseUnits"></ion-input></label>
+            <label class="medication-quick-field"><span>Avisar al quedar</span><ion-input type="text" inputmode="decimal" [(ngModel)]="medicationLowStockThreshold"></ion-input></label>
           </div>
           }
           <div class="treatment-calculation">
@@ -989,7 +1074,7 @@
                     </div>
                   </div>
                   @if (restockingMedicationId === treatment.id) {
-                  <div class="medication-restock-editor"><span>Agregar {{ treatment.stockUnit }}</span><ion-input type="number" min="0.1" inputmode="decimal" placeholder="Cantidad" [(ngModel)]="restockAmount"></ion-input><button type="button" (click)="cancelarReposicion()">Cancelar</button><button type="button" class="confirm" [disabled]="restockAmount <= 0" (click)="confirmarReposicion(treatment)">Agregar</button></div>
+                  <div class="medication-restock-editor"><span>Agregar {{ treatment.stockUnit }}</span><ion-input type="text" inputmode="decimal" placeholder="Cantidad" [(ngModel)]="restockAmount"></ion-input><button type="button" (click)="cancelarReposicion()">Cancelar</button><button type="button" class="confirm" [disabled]="restockAmount <= 0" (click)="confirmarReposicion(treatment)">Agregar</button></div>
                   }
                   }
                 </div>
@@ -1109,7 +1194,7 @@
       <ion-header>
         <ion-toolbar>
           @if (walletView !== 'dashboard') {
-          <ion-buttons slot="start"><ion-button fill="clear" aria-label="Volver a Billetera" (click)="walletView = 'dashboard'"><ion-icon name="chevron-back-outline"></ion-icon></ion-button></ion-buttons>
+          <ion-buttons slot="start"><ion-button fill="clear" aria-label="Volver a Billetera" (click)="volverEnBilletera()"><ion-icon name="chevron-back-outline"></ion-icon></ion-button></ion-buttons>
           }
           <ion-title>{{ walletModalTitle }}</ion-title>
           @if (walletView === 'dashboard') {
@@ -1128,11 +1213,13 @@
           <div class="wallet-summary-grid">
             <div><span>Ingresos</span><strong>{{ walletMoney(walletSummary.salary + walletSummary.extraIncome) }}</strong></div>
             <div><span>Gastado</span><strong>{{ walletMoney(walletSummary.spent) }}</strong></div>
-            <div><span>Comprometido</span><strong>{{ walletMoney(walletSummary.pendingFixed) }}</strong></div>
+            <div><span>Comprometido</span><strong>{{ walletMoney(walletSummary.pendingFixed + walletSummary.pendingLoans) }}</strong></div>
+            <div><span>Deuda pendiente</span><strong>{{ walletMoney(walletSummary.totalDebt) }}</strong></div>
           </div>
           <div class="wallet-command-row">
             <button type="button" (click)="nuevaTransaccionBilletera('expense')"><ion-icon name="receipt-outline"></ion-icon><span>Gasto</span></button>
             <button type="button" (click)="nuevaTransaccionBilletera('income')"><ion-icon name="cash-outline"></ion-icon><span>Ingreso</span></button>
+            <button type="button" (click)="verPrestamosDesdeBilletera()"><ion-icon name="cash-outline"></ion-icon><span>Préstamos</span></button>
             <button type="button" (click)="nuevoGastoFijo()"><ion-icon name="calendar-outline"></ion-icon><span>Gasto fijo</span></button>
             <button type="button" (click)="editarSueldo()"><ion-icon name="wallet-outline"></ion-icon><span>Sueldo</span></button>
           </div>
@@ -1173,17 +1260,27 @@
         <section class="wallet-form">
           <div class="wallet-kind-switch"><button type="button" [class.active]="walletTransactionKind === 'expense'" (click)="walletTransactionKind = 'expense'">Gasto</button><button type="button" [class.active]="walletTransactionKind === 'income'" (click)="walletTransactionKind = 'income'">Ingreso</button></div>
           <ion-input label="Concepto" label-placement="stacked" placeholder="Ej. Comida o venta" [(ngModel)]="walletDescription"></ion-input>
-          <ion-input label="Cantidad" label-placement="stacked" type="number" min="0" inputmode="decimal" placeholder="$0.00" [(ngModel)]="walletAmount"></ion-input>
+          <ion-input label="Cantidad" label-placement="stacked" type="text" inputmode="decimal" placeholder="$0.00" [(ngModel)]="walletAmount"></ion-input>
           <ion-select label="Categoría" label-placement="stacked" [(ngModel)]="walletCategory">@for (category of walletCategories; track category) { <ion-select-option [value]="category">{{ category }}</ion-select-option> }</ion-select>
+          @if (walletTransactionKind === 'expense' && walletCategory === 'Préstamo') {
+          <ion-select label="Préstamo relacionado" label-placement="stacked" placeholder="Selecciona un préstamo" [(ngModel)]="walletExpenseLoanId">
+            @for (loan of walletState.loans; track loan.id) { @if (loan.active) { <ion-select-option [value]="loan.id">{{ loan.creditor }} · saldo {{ walletMoney(loan.remainingAmount) }}</ion-select-option> } }
+          </ion-select>
+          }
+          @if (walletTransactionKind === 'income' && walletCategory === 'Préstamo') {
+          <ion-select label="Préstamo relacionado" label-placement="stacked" placeholder="Selecciona un préstamo" [(ngModel)]="walletIncomeLoanId">
+            @for (loan of walletState.loans; track loan.id) { <ion-select-option [value]="loan.id">{{ loan.creditor }} · saldo {{ walletMoney(loan.remainingAmount) }}</ion-select-option> }
+          </ion-select>
+          }
           <ion-input label="Fecha" label-placement="stacked" type="date" [(ngModel)]="walletDate"></ion-input>
-          <button type="button" class="wallet-primary" [disabled]="!walletDescription.trim() || !walletAmount || walletAmount <= 0" (click)="guardarTransaccionBilletera()">Guardar {{ walletTransactionKind === 'expense' ? 'gasto' : 'ingreso' }}</button>
+          <button type="button" class="wallet-primary" [disabled]="!walletDescription.trim() || !walletAmount || walletAmount <= 0 || (walletCategory === 'Préstamo' && (walletTransactionKind === 'expense' ? !walletExpenseLoanId : !walletIncomeLoanId))" (click)="guardarTransaccionBilletera()">Guardar {{ walletTransactionKind === 'expense' ? 'gasto' : 'ingreso' }}</button>
         </section>
         }
 
         @if (walletView === 'fixed') {
         <section class="wallet-form">
           <ion-input label="Nombre" label-placement="stacked" placeholder="Ej. Renta o internet" [(ngModel)]="fixedExpenseName"></ion-input>
-          <ion-input label="Cantidad" label-placement="stacked" type="number" min="0" inputmode="decimal" [(ngModel)]="fixedExpenseAmount"></ion-input>
+          <ion-input label="Cantidad" label-placement="stacked" type="text" inputmode="decimal" [(ngModel)]="fixedExpenseAmount"></ion-input>
           <div class="wallet-form-row">
             <ion-select label="Categoría" label-placement="stacked" [(ngModel)]="fixedExpenseCategory">@for (category of walletCategories; track category) { <ion-select-option [value]="category">{{ category }}</ion-select-option> }</ion-select>
             <ion-select label="Frecuencia" label-placement="stacked" [(ngModel)]="fixedExpenseFrequencyMonths"><ion-select-option [value]="1">Mensual</ion-select-option><ion-select-option [value]="2">Bimestral</ion-select-option></ion-select>
@@ -1192,7 +1289,7 @@
             @if (fixedExpenseFrequencyMonths === 2) {
             <ion-input label="Primer vencimiento" label-placement="stacked" type="date" [(ngModel)]="fixedExpenseFirstDueDate"></ion-input>
             } @else {
-            <ion-input label="Día de vencimiento" label-placement="stacked" type="number" min="1" max="31" [(ngModel)]="fixedExpenseDueDay"></ion-input>
+            <ion-input label="Día de vencimiento" label-placement="stacked" type="text" inputmode="numeric" [(ngModel)]="fixedExpenseDueDay"></ion-input>
             }
             <ion-input label="Hora del aviso" label-placement="stacked" type="time" [(ngModel)]="fixedExpenseReminderTime"></ion-input>
           </div>
@@ -1207,7 +1304,7 @@
             <span><strong>{{ payingFixedOccurrence.expense.name }}</strong><small>{{ walletDueLabel(payingFixedOccurrence) }}</small></span>
             <span><small>Monto previsto</small><b>{{ walletMoney(payingFixedOccurrence.expense.amount) }}</b></span>
           </div>
-          <ion-input label="Cuánto pagaste" label-placement="stacked" type="number" min="0.01" inputmode="decimal" [(ngModel)]="fixedPaymentAmount"></ion-input>
+          <ion-input label="Cuánto pagaste" label-placement="stacked" type="text" inputmode="decimal" [(ngModel)]="fixedPaymentAmount"></ion-input>
           <ion-input label="Fecha de pago" label-placement="stacked" type="date" [(ngModel)]="fixedPaymentDate"></ion-input>
           <button type="button" class="wallet-primary" [disabled]="!fixedPaymentAmount || fixedPaymentAmount <= 0 || !fixedPaymentDate" (click)="guardarPagoGastoFijo()">Confirmar pago</button>
         </section>
@@ -1215,11 +1312,62 @@
 
         @if (walletView === 'settings') {
         <section class="wallet-form">
-          <ion-input label="Sueldo por quincena" label-placement="stacked" type="number" min="0" inputmode="decimal" [(ngModel)]="walletSalaryAmount"></ion-input>
-          <ion-select label="Forma de pago" label-placement="stacked" [(ngModel)]="walletPaySchedule"><ion-select-option value="semi-monthly">Días 15 y fin de mes</ion-select-option><ion-select-option value="biweekly">Cada 14 días</ion-select-option></ion-select>
+          <ion-input label="Sueldo por periodo" label-placement="stacked" type="text" inputmode="decimal" [(ngModel)]="walletSalaryAmount"></ion-input>
+          <ion-select label="Forma de pago" label-placement="stacked" [(ngModel)]="walletPaySchedule"><ion-select-option value="semi-monthly">Días 15 y fin de mes</ion-select-option><ion-select-option value="biweekly">Cada 14 días</ion-select-option><ion-select-option value="weekly">Pago semanal</ion-select-option></ion-select>
           @if (walletPaySchedule === 'semi-monthly') { <ion-toggle [(ngModel)]="walletMoveWeekendPayToFriday">Pago en días hábiles</ion-toggle> }
           @if (walletPaySchedule === 'biweekly') { <ion-input label="Primera fecha de pago" label-placement="stacked" type="date" [(ngModel)]="walletFirstPayDate"></ion-input> }
+          @if (walletPaySchedule === 'weekly') { <ion-select label="Día de pago" label-placement="stacked" [(ngModel)]="walletWeeklyPayDay">@for (day of loanWeekdays; track day.value) { <ion-select-option [value]="day.value">{{ day.label }}</ion-select-option> }</ion-select> }
           <button type="button" class="wallet-primary" (click)="guardarConfiguracionBilletera()">Guardar sueldo</button>
+        </section>
+        }
+
+        @if (walletView === 'loans') {
+        <section class="wallet-view">
+          <div class="wallet-balance-band">
+            <span>Deuda pendiente total</span>
+            <strong [class.negative]="walletSummary.totalDebt > 0">{{ walletMoney(walletSummary.totalDebt) }}</strong>
+            <small>Pagos comprometidos en este periodo: {{ walletMoney(walletSummary.pendingLoans) }}</small>
+          </div>
+          <button type="button" class="wallet-primary" (click)="nuevoPrestamo()">Agregar préstamo</button>
+          @if (walletState.loans.length === 0) { <p class="wallet-empty">No hay préstamos registrados.</p> }
+          @for (loan of walletState.loans; track loan.id) {
+          <article class="wallet-list-row" [class.overdue]="!loan.active">
+            <span><strong>{{ loan.creditor }}</strong><small>Saldo: {{ walletMoney(loan.remainingAmount) }} · Pago: {{ walletMoney(loan.paymentAmount) }} · {{ loan.paymentSchedule === 'fixed' ? ('Día ' + loan.dueDay + ' de cada mes') : loan.paymentSchedule === 'weekly' ? ('Cada ' + loanWeekdayLabel(loan.dueWeekday)) : (loan.tentativePaymentDate ? ('Tentativa: ' + formatDate(loan.tentativePaymentDate)) : 'Sin fecha definida') }}</small></span>
+            <div class="wallet-loan-actions"><button type="button" (click)="abrirPagoPrestamo(loan)" [disabled]="!loan.active">Abonar</button><button type="button" (click)="nuevoPrestamo(loan)">Editar</button></div>
+          </article>
+          <div class="wallet-loan-history">
+            <strong>Historial de pagos</strong>
+            @if (loanPaymentHistory(loan.id).length === 0) { <small>Aún no hay abonos registrados.</small> }
+            @for (payment of loanPaymentHistory(loan.id); track payment.id) {
+            <div><span>{{ formatDate(payment.date) }}</span><b>−{{ walletMoney(payment.amount) }}</b></div>
+            }
+          </div>
+          }
+        </section>
+        }
+
+        @if (walletView === 'loan-form') {
+        <section class="wallet-form">
+          <ion-input label="Banco o persona" label-placement="stacked" placeholder="Ej. Banco, familiar o amigo" [(ngModel)]="loanCreditor"></ion-input>
+          <ion-input label="Monto original" label-placement="stacked" type="text" inputmode="decimal" [(ngModel)]="loanOriginalAmount"></ion-input>
+          @if (editingLoanId) { <ion-input label="Saldo pendiente" label-placement="stacked" type="text" inputmode="decimal" [(ngModel)]="loanRemainingAmount"></ion-input> }
+          <ion-input label="Pago estimado" label-placement="stacked" type="text" inputmode="decimal" [(ngModel)]="loanPaymentAmount"></ion-input>
+          <ion-select label="Tipo de fecha" label-placement="stacked" [(ngModel)]="loanPaymentSchedule"><ion-select-option value="fixed">Fecha fija cada mes</ion-select-option><ion-select-option value="weekly">Pago semanal</ion-select-option><ion-select-option value="tentative">Fecha tentativa</ion-select-option></ion-select>
+          @if (loanPaymentSchedule === 'fixed') { <ion-input label="Día de pago" label-placement="stacked" type="text" inputmode="numeric" [(ngModel)]="loanDueDay"></ion-input> }
+          @if (loanPaymentSchedule === 'weekly') { <ion-select label="Día de pago" label-placement="stacked" [(ngModel)]="loanDueWeekday">@for (day of loanWeekdays; track day.value) { <ion-select-option [value]="day.value">{{ day.label }}</ion-select-option> }</ion-select> }
+          @if (loanPaymentSchedule === 'tentative') { <ion-input label="Fecha tentativa de pago" label-placement="stacked" type="date" [(ngModel)]="loanTentativePaymentDate"></ion-input> }
+          <ion-textarea label="Notas" label-placement="stacked" placeholder="Opcional" [(ngModel)]="loanNotes"></ion-textarea>
+          <button type="button" class="wallet-primary" [disabled]="!loanCreditor.trim() || !loanOriginalAmount || !loanPaymentAmount" (click)="guardarPrestamo()">Guardar préstamo</button>
+          @if (editingLoanId) { <button type="button" class="wallet-danger" (click)="eliminarPrestamo(editingLoanId)">Eliminar préstamo</button> }
+        </section>
+        }
+
+        @if (walletView === 'loan-payment' && payingLoan) {
+        <section class="wallet-form">
+          <div class="wallet-payment-reference"><span><strong>{{ payingLoan.creditor }}</strong><small>Saldo pendiente</small></span><b>{{ walletMoney(payingLoan.remainingAmount) }}</b></div>
+          <ion-input label="Monto del abono" label-placement="stacked" type="text" inputmode="decimal" [(ngModel)]="loanPaymentValue"></ion-input>
+          <ion-input label="Fecha del abono" label-placement="stacked" type="date" [(ngModel)]="loanPaymentDate"></ion-input>
+          <button type="button" class="wallet-primary" [disabled]="!loanPaymentValue || loanPaymentValue <= 0 || !loanPaymentDate" (click)="guardarPagoPrestamo()">Confirmar abono</button>
         </section>
         }
       </ion-content>
@@ -1247,12 +1395,10 @@
                   <span><strong>{{ label.nombre }}</strong><small>{{ labelCount(label.nombre) }} pendientes</small></span>
                   <ion-icon name="chevron-down-outline"></ion-icon>
                 </button>
-                <ion-toggle
-                  [checked]="reminderSettingsFor(label.nombre).enabled"
-                  [attr.aria-label]="'Activar recordatorios para ' + label.nombre"
-                  (click)="$event.stopPropagation()"
-                  (ionChange)="setLabelRemindersEnabled(label.nombre, $event.detail.checked)"
-                ></ion-toggle>
+                <div class="label-reminder-toggles" (click)="$event.stopPropagation()">
+                  <label><span>Recordatorio</span><ion-toggle [checked]="reminderSettingsFor(label.nombre).enabled" [attr.aria-label]="'Activar recordatorios para ' + label.nombre" (ionChange)="setLabelRemindersEnabled(label.nombre, $event.detail.checked)"></ion-toggle></label>
+                  <label><span>Insistente</span><ion-toggle [checked]="reminderSettingsFor(label.nombre).insistentEnabled" [disabled]="!reminderSettingsFor(label.nombre).enabled" [attr.aria-label]="'Activar recordatorio insistente para ' + label.nombre" (ionChange)="setLabelInsistentEnabled(label.nombre, $event.detail.checked)"></ion-toggle></label>
+                </div>
               </div>
 
               @if (expandedReminderLabel === label.nombre) {
@@ -1419,11 +1565,43 @@
     </ng-template>
   </ion-modal>
 
+  <ion-modal [isOpen]="selfCareEditorOpen" (didDismiss)="selfCareEditorOpen = false" cssClass="settings-reminder-modal self-care-editor-modal">
+    <ng-template>
+      <ion-header><ion-toolbar><ion-title>{{ editingSelfCareHabitId ? 'Editar hábito' : 'Nuevo hábito' }}</ion-title><ion-buttons slot="end"><ion-button fill="clear" (click)="selfCareEditorOpen = false"><ion-icon name="close"></ion-icon></ion-button></ion-buttons></ion-toolbar></ion-header>
+      <ion-content class="modal-content"><section class="wallet-form self-care-editor">
+        <ion-input label="Nombre del hábito" label-placement="stacked" placeholder="Ej. Lavarme los dientes" [(ngModel)]="selfCareName"></ion-input>
+        <ion-select label="Icono" label-placement="stacked" [(ngModel)]="selfCareIcon">@for (icon of selfCareIcons; track icon) { <ion-select-option [value]="icon">{{ icon }}</ion-select-option> }</ion-select>
+        <label class="self-care-color-row"><span>Color</span><input type="color" [(ngModel)]="selfCareColor" aria-label="Color del hábito" /></label>
+        <div class="self-care-days"><strong>Días</strong><div>@for (day of diasSemana; track $index) { <button type="button" [class.selected]="selfCareDays.includes(($index + 1) % 7)" (click)="toggleSelfCareDay(($index + 1) % 7)">{{ day }}</button> }</div></div>
+        <div class="self-care-time-picker">
+          <span><strong>Horarios opcionales</strong><small>Agrega una o varias horas para este hábito.</small></span>
+          <div class="self-care-time-add"><ion-input type="time" [(ngModel)]="selfCareTimeDraft" aria-label="Hora del hábito"></ion-input><button type="button" (click)="addSelfCareTime()">Agregar</button></div>
+          @if (selfCareTimes.length > 0) { <div class="self-care-time-chips">@for (time of selfCareTimes; track time) { <button type="button" (click)="removeSelfCareTime(time)"><ion-icon name="time-outline"></ion-icon>{{ time }} <span>×</span></button> }</div> }
+        </div>
+        <div class="self-care-switch"><span><strong>Esencial en días de poca energía</strong><small>Se mostrará primero en modo de poca energía.</small></span><ion-toggle [(ngModel)]="selfCareEssential"></ion-toggle></div>
+        <div class="self-care-switch"><span><strong>Recordatorios</strong><small>Guardado para próximos avisos.</small></span><ion-toggle [(ngModel)]="selfCareReminders"></ion-toggle></div>
+        <div class="self-care-editor-actions" [class.with-delete]="editingSelfCareHabitId !== null">
+          <button type="button" class="self-care-save" [disabled]="!selfCareName.trim()" (click)="saveSelfCareHabit()">Guardar hábito</button>
+          @if (editingSelfCareHabitId) { <button type="button" class="self-care-delete" (click)="deleteSelfCareHabit()">Eliminar</button> }
+        </div>
+      </section></ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <ion-modal [isOpen]="selfCareHistoryOpen" (didDismiss)="selfCareHistoryOpen = false" cssClass="settings-reminder-modal">
+    <ng-template><ion-header><ion-toolbar><ion-title>Historial de hoy</ion-title><ion-buttons slot="end"><ion-button fill="clear" (click)="selfCareHistoryOpen = false"><ion-icon name="close"></ion-icon></ion-button></ion-buttons></ion-toolbar></ion-header><ion-content class="modal-content"><section class="self-care-history">
+      <div><h2>Completados</h2><span>{{ selfCareHistoryEntries.length + selfCareHistoryMedicationEntries.length }}</span></div>
+      @if (selfCareHistoryEntries.length === 0 && selfCareHistoryMedicationEntries.length === 0) { <p class="self-care-empty">Todavía no hay hábitos completados hoy.</p> }
+      @for (entry of selfCareHistoryEntries; track entry.habit.id + entry.timeKey) { <article class="self-care-card completed" [style.--care-color]="entry.habit.color"><span class="self-care-icon">{{ entry.habit.icon }}</span><span class="self-care-main"><strong>{{ entry.habit.name }}</strong><small>{{ entry.timeKey }} · Completado</small></span><ion-checkbox [checked]="true" (ionChange)="toggleSelfCareEntry(entry.habit, entry.timeKey)"></ion-checkbox></article> }
+      @for (dose of selfCareHistoryMedicationEntries; track dose.id) { <article class="self-care-card medication completed"><span class="self-care-icon">💊</span><span class="self-care-main"><strong>{{ selfCareMedicationName(dose) }}</strong><small>{{ dose.scheduledAt.slice(11, 16) }} · Medicamento tomado</small></span><ion-checkbox [checked]="true" (ionChange)="toggleMedicationDose(dose)"></ion-checkbox></article> }
+    </section></ion-content></ng-template>
+  </ion-modal>
+
 </ion-content>
 
 @if (!eventEditorOpen) {
 <ion-footer class="bottom-nav">
-  <nav aria-label="Navegacion principal">
+  <nav aria-label="Navegacion principal" [class.with-care]="selfCareState.enabled">
     <button
       type="button"
       [class.active]="selectedView === 'hoy'"
@@ -1448,14 +1626,16 @@
       <ion-icon name="checkbox-outline"></ion-icon>
       <span>Tareas</span>
     </button>
+    @if (selfCareState.enabled) {
     <button
       type="button"
-      [class.active]="selectedView === 'mas'"
-      (click)="selectView('mas')"
+      [class.active]="selectedView === 'cuidado'"
+      (click)="selectView('cuidado')"
     >
-      <ion-icon name="menu-outline"></ion-icon>
-      <span>Mas</span>
+      <ion-icon name="heart-outline"></ion-icon>
+      <span>Cuidado</span>
     </button>
+    }
   </nav>
 </ion-footer>
 }

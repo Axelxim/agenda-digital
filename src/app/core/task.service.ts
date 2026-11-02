@@ -27,6 +27,9 @@ interface TaskDraft {
   prioridad: TaskPriority;
   etiqueta?: TaskLabel;
   insistentReminder?: boolean;
+  reminderDate?: string;
+  reminderTime?: string;
+  eventReminderMinutes?: number;
   favorita?: boolean;
   repeticion?: TaskRepeat;
   parentId?: number;
@@ -266,6 +269,9 @@ export class TaskService {
         estado: 'pendiente',
         etiqueta: draft.etiqueta,
         insistentReminder: draft.insistentReminder === true,
+        reminderDate: this.cleanOptional(draft.reminderDate),
+        reminderTime: this.cleanOptional(draft.reminderTime),
+        eventReminderMinutes: this.normalizeEventReminderMinutes(draft.eventReminderMinutes),
         favorita: draft.favorita ?? false,
         repeticion: repetition,
         seriesId: repetition !== 'none' ? `serie-${id}` : undefined,
@@ -301,6 +307,9 @@ export class TaskService {
             prioridad: draft.prioridad,
             etiqueta: draft.etiqueta,
             insistentReminder: draft.insistentReminder === true,
+            reminderDate: this.cleanOptional(draft.reminderDate),
+            reminderTime: this.cleanOptional(draft.reminderTime),
+            eventReminderMinutes: this.normalizeEventReminderMinutes(draft.eventReminderMinutes),
             favorita: draft.favorita ?? false,
             repeticion: repetition,
             seriesId: repetition !== 'none' ? tarea.seriesId ?? `serie-${id}` : undefined,
@@ -867,6 +876,9 @@ export class TaskService {
       estado: this.normalizeStatus(task.estado),
       etiqueta: this.normalizeLabel(task.etiqueta),
       insistentReminder: task.insistentReminder === true,
+      reminderDate: this.cleanOptional(task.reminderDate),
+      reminderTime: this.cleanOptional(task.reminderTime),
+      eventReminderMinutes: this.normalizeEventReminderMinutes(task.eventReminderMinutes),
       favorita: task.favorita ?? false,
       repeticion,
       seriesId: typeof task.seriesId === 'string'
@@ -887,6 +899,11 @@ export class TaskService {
         ? task.syncStatus
         : 'pending',
     };
+  }
+
+  private normalizeEventReminderMinutes(value: unknown): number | undefined {
+    const allowed = [0, 5, 10, 15, 30, 60, 120, 1440];
+    return typeof value === 'number' && allowed.includes(value) ? value : undefined;
   }
 
   private normalizeSubtasks(subtasks?: TaskSubtask[]): TaskSubtask[] | undefined {

@@ -47,6 +47,25 @@ describe('NotificationSchedulerService', () => {
     ], settings)).toEqual([]);
   });
 
+  it('schedules a normal reminder before an event when the user chooses it', () => {
+    const event: Task = {
+      ...universityTask(),
+      tipo: 'evento',
+      titulo: 'Cita médica',
+      eventReminderMinutes: 30,
+    };
+
+    const notifications = service.buildNotifications(
+      [event],
+      allSettings(),
+      new Date('2026-10-24T16:00:00'),
+    );
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].schedule?.at).toEqual(new Date('2026-10-24T17:30:00'));
+    expect(notifications[0].extra.reminderType).toBe('event');
+  });
+
   it('schedules pending medication doses and ignores taken or overdue doses', () => {
     const treatment = {
       id: 'treatment-1',

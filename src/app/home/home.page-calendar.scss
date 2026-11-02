@@ -77,7 +77,8 @@ ion-modal.task-editor-modal::part(content) { border: 1px solid #4a4a4a; box-shad
 .task-editor-content { --background: #303030; --color: #f4f4f4; }
 
 .bottom-nav { border-top: 1px solid var(--border); }
-.bottom-nav nav { display: grid; grid-template-columns: repeat(4,1fr); width: min(100%,760px); margin: 0 auto; padding: 6px 10px max(6px, env(safe-area-inset-bottom)); }
+.bottom-nav nav { display: grid; grid-template-columns: repeat(3, minmax(0, 112px)); justify-content: center; width: min(100%,760px); margin: 0 auto; padding: 6px 10px max(6px, env(safe-area-inset-bottom)); }
+.bottom-nav nav.with-care { grid-template-columns: repeat(4, minmax(0, 112px)); }
 .bottom-nav button { display: grid; gap: 2px; justify-items: center; min-height: 54px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 800; }
 .bottom-nav ion-icon { font-size: 21px; }
 .bottom-nav button.active { color: var(--primary); }

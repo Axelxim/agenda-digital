@@ -47,6 +47,7 @@ export class LabelReminderService {
     return {
       label,
       enabled: false,
+      insistentEnabled: false,
       advanceMinutes: this.leadOptions.map((option) => option.minutes),
       duePromptEnabled: true,
       dateOnlyTime: '09:00',
@@ -103,6 +104,7 @@ export class LabelReminderService {
     return {
       label,
       enabled: stored?.enabled === true,
+      insistentEnabled: stored?.insistentEnabled === true,
       advanceMinutes,
       duePromptEnabled: stored?.duePromptEnabled !== false,
       dateOnlyTime,

@@ -1,12 +1,13 @@
-export type WalletPaySchedule = 'semi-monthly' | 'biweekly';
+export type WalletPaySchedule = 'semi-monthly' | 'biweekly' | 'weekly';
 export type WalletTransactionKind = 'income' | 'expense';
-export type WalletTransactionType = 'extra-income' | 'variable-expense' | 'fixed-expense';
+export type WalletTransactionType = 'extra-income' | 'variable-expense' | 'fixed-expense' | 'loan-payment' | 'loan-disbursement';
 export type FixedExpenseFrequency = 1 | 2;
 
 export interface WalletSettings {
   salaryAmount: number;
   paySchedule: WalletPaySchedule;
   firstPayDate: string;
+  weeklyPayDay: number;
   moveWeekendPayToFriday: boolean;
   currency: 'MXN';
 }
@@ -37,12 +38,31 @@ export interface WalletTransaction {
   date: string;
   fixedExpenseId?: string;
   fixedPeriod?: string;
+  loanId?: string;
+  loanPeriod?: string;
   createdAt: string;
+}
+
+export interface WalletLoan {
+  id: string;
+  creditor: string;
+  originalAmount: number;
+  remainingAmount: number;
+  paymentAmount: number;
+  paymentSchedule: 'fixed' | 'weekly' | 'tentative';
+  dueDay: number;
+  dueWeekday: number;
+  tentativePaymentDate?: string;
+  notes: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface WalletState {
   settings: WalletSettings;
   fixedExpenses: FixedExpense[];
+  loans: WalletLoan[];
   transactions: WalletTransaction[];
 }
 
@@ -62,6 +82,8 @@ export interface WalletSummary {
   extraIncome: number;
   spent: number;
   pendingFixed: number;
+  pendingLoans: number;
+  totalDebt: number;
   available: number;
   afterCommitments: number;
 }

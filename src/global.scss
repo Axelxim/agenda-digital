@@ -1284,6 +1284,122 @@ ion-modal.wallet-modal {
   box-shadow: inset 3px 0 #ff4d67;
 }
 
+.wallet-modal .wallet-loan-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.wallet-modal .wallet-loan-actions button {
+  padding: 0 8px;
+}
+
+.wallet-modal .wallet-loan-history {
+  display: grid;
+  gap: 7px;
+  margin: 0 10px 12px;
+  padding: 10px;
+  border: 1px solid #273140;
+  border-radius: 8px;
+  background: #111923;
+}
+
+.wallet-modal .wallet-loan-history > strong {
+  font-size: 11px;
+  color: #cdd7e5;
+}
+
+.wallet-modal .wallet-loan-history > small {
+  color: #8491a5;
+  font-size: 10px;
+}
+
+.wallet-modal .wallet-loan-history > div {
+  display: flex;
+  justify-content: space-between;
+  color: #aeb9ca;
+  font-size: 11px;
+}
+
+.wallet-modal .wallet-loan-history b {
+  color: #55dfac;
+}
+
+.label-reminder-toggles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.label-reminder-toggles label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #b7c4d5;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.label-reminder-toggles ion-toggle {
+  --handle-width: 18px;
+  --handle-height: 18px;
+  width: 35px;
+  height: 20px;
+}
+
+ion-input[type='number']::part(native) {
+  appearance: textfield;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+ion-input[type='number']::part(native)::-webkit-inner-spin-button,
+ion-input[type='number']::part(native)::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+  margin: 0;
+}
+
+.self-care-view { display: grid; gap: 16px; }
+.self-care-hero { display: flex; gap: 12px; align-items: center; padding: 8px 4px; }
+.self-care-heart { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 20px; background: linear-gradient(135deg,#7246e8,#d079ff); color:#fff; font-size: 46px; line-height:1; }
+.self-care-hero h1 { margin: 0; color: var(--text); font-size: 28px; }
+.self-care-hero p { margin: 5px 0 0; color: var(--muted); font-size: 14px; }
+.self-care-progress { position:relative; display: flex; align-items:center; gap:16px; padding:16px 54px 16px 16px; border:1px solid #6f4cb8; border-radius:22px; background:linear-gradient(135deg,#171c42,#30185c); color:#fff; }
+.self-care-history-button { position:absolute; top:12px; right:12px; display:grid; place-items:center; width:34px; height:34px; border:1px solid #7655c5; border-radius:10px; background:#21154b; color:#d9c8ff; }.self-care-history-button ion-icon { font-size:19px; }
+.self-care-ring { --progress:0%; display:grid; place-items:center; width:82px; height:82px; border-radius:50%; background:conic-gradient(#3de0b2 var(--progress),#314156 0); }
+.self-care-ring::before { content:''; grid-area:1/1; width:62px; height:62px; border-radius:50%; background:#1b1f47; }
+.self-care-ring span { grid-area:1/1; z-index:1; font-weight:800; }
+.self-care-progress div:last-child { display:grid; gap:4px; }.self-care-progress b { font-size:24px; }.self-care-progress small { color:#48e1ba; }
+.self-care-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }.self-care-tabs button { min-height:42px; border:1px solid #33405a; border-radius:14px; background:#172035; color:#dce4f5; font-size:12px; }.self-care-tabs button.active { border-color:#9a63f6; background:linear-gradient(135deg,#405be6,#9348e9); color:#fff; }
+.self-care-list { display:grid; gap:10px; }.self-care-card { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; padding:10px 12px; border:1px solid #29334b; border-radius:17px; background:#151d2c; }.self-care-card.completed { border-color:color-mix(in srgb,var(--care-color,#38dcae) 55%,#29334b); background:color-mix(in srgb,var(--care-color,#38dcae) 11%,#151d2c); }.self-care-icon { display:grid; place-items:center; width:48px; height:48px; border-radius:15px; background:color-mix(in srgb,var(--care-color,#5478ff) 35%,#263e62); font-size:26px; }.self-care-main { display:grid; gap:4px; min-width:0; border:0; background:transparent; text-align:left; color:inherit; }.self-care-main strong { color:var(--text); font-size:16px; }.self-care-main small { color:var(--muted); }.self-care-card ion-checkbox { --size:27px; --checkbox-background:#111827; --border-color:#9ca9c4; --checkbox-background-checked:#36dfa8; --border-color-checked:#36dfa8; }.self-care-empty { padding:25px 10px; text-align:center; color:var(--muted); }
+.self-care-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }.self-care-add,.self-care-energy { min-height:52px; border-radius:15px; font-weight:800; }.self-care-add { border:0; background:linear-gradient(135deg,#5065f4,#9a52ef); color:#fff; }.self-care-energy { border:1px solid #35415c; background:#182137; color:#edf1fb; }.self-care-energy.active { border-color:#f7c54f; color:#ffdb74; }
+.self-care-history { display:grid; gap:9px; padding-top:4px; }.self-care-history > div { display:flex; align-items:center; justify-content:space-between; }.self-care-history h2 { margin:0; color:var(--text); font-size:15px; }.self-care-history > div span { color:var(--muted); font-size:11px; }
+.self-care-days { display:grid; gap:9px; }.self-care-days > div { display:flex; flex-wrap:wrap; gap:7px; }.self-care-days button { min-width:39px; min-height:34px; border:1px solid #3b4862; border-radius:9px; background:#182137; color:#cfd8e8; }.self-care-days button.selected { border-color:#9a63f6; background:#5530a5; color:#fff; }
+.self-care-editor { display:grid; gap:16px; padding:18px 16px 28px !important; }
+.self-care-color-row { display:flex; align-items:center; justify-content:space-between; min-height:52px; padding:0 12px; border:1px solid #31405b; border-radius:10px; background:#080d14; color:#dce5f5; }
+.self-care-color-row span { font-size:14px; font-weight:700; }
+.self-care-color-row input { width:42px; height:32px; padding:0; border:0; border-radius:8px; background:transparent; }
+.self-care-switch { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:14px; min-height:62px; padding:11px 12px; border:1px solid #31405b; border-radius:10px; background:#111927; }
+.self-care-switch > span { display:grid; gap:4px; min-width:0; }.self-care-switch strong { color:#edf3fd; font-size:13px; }.self-care-switch small { color:#9eacc1; font-size:11px; line-height:1.3; }
+.self-care-time-picker { display:grid; gap:9px; }.self-care-time-picker > span { display:grid; gap:4px; }.self-care-time-picker strong { color:#edf3fd; font-size:13px; }.self-care-time-picker small { color:#9eacc1; font-size:11px; }.self-care-time-add { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; }.self-care-time-add ion-input { --background:#080d14; --color:#f4f7fb; --padding-start:16px; --padding-end:12px; border:1px solid #31405b; border-radius:10px; }.self-care-time-add ion-input::part(native) { padding-left:16px; }.self-care-time-add button { min-width:82px; border:0; border-radius:10px; background:#6041bf; color:#fff; font-weight:700; }.self-care-time-chips { display:flex; flex-wrap:wrap; gap:7px; }.self-care-time-chips button { display:flex; align-items:center; gap:5px; min-height:32px; padding:0 9px; border:1px solid #7350d0; border-radius:9px; background:#25174d; color:#e5dcff; }.self-care-time-chips ion-icon { font-size:14px; }.self-care-time-chips span { color:#dba7ff; font-size:17px; line-height:1; }
+.self-care-editor-actions { display:grid; grid-template-columns:1fr; gap:10px; }.self-care-editor-actions.with-delete { grid-template-columns:auto minmax(0,1fr); }.self-care-save { width:100%; min-height:48px; border:0; border-radius:12px; background:linear-gradient(135deg,#5268f2,#a34cf0); color:#fff; font-size:14px; font-weight:800; box-shadow:0 8px 20px rgba(116,71,226,.3); }.self-care-save:disabled { opacity:.42; box-shadow:none; }.self-care-delete { min-height:48px; padding:0 16px; border:1px solid #a6485b; border-radius:12px; background:#281820; color:#ff8c9d; font-size:13px; font-weight:800; }
+@media (max-width: 390px) { .self-care-tabs button { font-size:10px; padding:4px; }.self-care-hero h1 { font-size:24px; }.self-care-heart { width:48px; height:48px; font-size:38px; } }
+
 .wallet-modal .wallet-movement-row.income b {
   color: #55dfac;
 }

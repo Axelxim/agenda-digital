@@ -47,6 +47,7 @@ import {
   ellipsisHorizontal,
   giftOutline,
   homeOutline,
+  heartOutline,
   menuOutline,
   medicalOutline,
   walletOutline,
@@ -99,17 +100,19 @@ import { MedicationDose, MedicationTreatment, WellnessSettings } from '../core/w
 import { WellnessService } from '../core/wellness.service';
 import { QuickNote } from '../core/note.model';
 import { NoteService } from '../core/note.service';
-import { FixedExpense, FixedExpenseOccurrence, WalletState, WalletTransactionKind } from '../core/wallet.model';
+import { FixedExpense, FixedExpenseOccurrence, WalletLoan, WalletState, WalletTransactionKind } from '../core/wallet.model';
 import { WalletService } from '../core/wallet.service';
+import { SelfCareCompletion, SelfCareHabit, SelfCareFilter, SelfCareState } from '../core/self-care.model';
+import { SelfCareService } from '../core/self-care.service';
 
-type ViewMode = 'hoy' | 'calendario' | 'pendientes' | 'mas';
+type ViewMode = 'hoy' | 'calendario' | 'pendientes' | 'cuidado' | 'mas';
 type CalendarView = 'dia' | 'semana' | 'mes';
 type PendingFilter = 'pendientes' | 'programadas' | 'vencidas' | 'completadas';
 type FormMode = 'create' | 'edit' | 'reschedule';
 type WellnessView = 'treatment' | 'medication';
 type MedicationHistoryStatus = 'taken' | 'late' | 'missed' | 'overdue' | 'pending';
 type MedicationHistoryFilter = 'all' | MedicationHistoryStatus;
-type WalletView = 'dashboard' | 'transaction' | 'fixed' | 'payment' | 'settings';
+type WalletView = 'dashboard' | 'transaction' | 'fixed' | 'payment' | 'settings' | 'loans' | 'loan-form' | 'loan-payment';
 
 interface TreatmentMedicationDraft {
   key: string;
@@ -222,6 +225,7 @@ export class HomePage implements OnInit, OnDestroy {
   private readonly wellnessService = inject(WellnessService);
   private readonly noteService = inject(NoteService);
   private readonly walletService = inject(WalletService);
+  private readonly selfCareService = inject(SelfCareService);
   private readonly menuController = inject(MenuController);
   private readonly changeDetector = inject(ChangeDetectorRef);
 
@@ -283,6 +287,20 @@ export class HomePage implements OnInit, OnDestroy {
   medicationTreatments: MedicationTreatment[] = [];
   medicationDoses: MedicationDose[] = [];
   wellnessView: WellnessView = 'treatment';
+  selfCareState: SelfCareState = { enabled: false, habits: [], completions: [], lowEnergy: false };
+  selfCareFilter: SelfCareFilter = 'daily';
+  selfCareEditorOpen = false;
+  selfCareHistoryOpen = false;
+  editingSelfCareHabitId: string | null = null;
+  selfCareName = '';
+  selfCareIcon = '✨';
+  selfCareColor = '#8b5cf6';
+  selfCareDays = [0, 1, 2, 3, 4, 5, 6];
+  selfCareTimes: string[] = [];
+  selfCareTimeDraft = '08:00';
+  selfCareEssential = false;
+  selfCareReminders = false;
+  readonly selfCareIcons = ['🪥', '💧', '🧴', '🚿', '🍽️', '💊', '✨', '🧘'];
   treatmentName = '';
   treatmentStartDate = '';
   treatmentMedicationDrafts: TreatmentMedicationDraft[] = [];
@@ -321,16 +339,20 @@ export class HomePage implements OnInit, OnDestroy {
   noteTitle = '';
   noteContent = '';
   walletState: WalletState = {
-    settings: { salaryAmount: 0, paySchedule: 'semi-monthly', firstPayDate: '', moveWeekendPayToFriday: false, currency: 'MXN' },
+    settings: { salaryAmount: 0, paySchedule: 'semi-monthly', firstPayDate: '', weeklyPayDay: 1, moveWeekendPayToFriday: false, currency: 'MXN' },
     fixedExpenses: [],
+    loans: [],
     transactions: [],
   };
   walletView: WalletView = 'dashboard';
+  loansStandalone = false;
   walletTransactionKind: WalletTransactionKind = 'expense';
   walletDescription = '';
   walletAmount: number | null = null;
   walletCategory = 'Otros';
   walletDate = '';
+  walletExpenseLoanId: string | null = null;
+  walletIncomeLoanId: string | null = null;
   editingFixedExpenseId: string | null = null;
   fixedExpenseName = '';
   fixedExpenseAmount: number | null = null;
@@ -348,13 +370,31 @@ export class HomePage implements OnInit, OnDestroy {
   fixedPaymentAmount: number | null = null;
   fixedPaymentDate = '';
   walletSalaryAmount: number | null = null;
-  walletPaySchedule: 'semi-monthly' | 'biweekly' = 'semi-monthly';
+  walletPaySchedule: 'semi-monthly' | 'biweekly' | 'weekly' = 'semi-monthly';
   walletFirstPayDate = '';
+  walletWeeklyPayDay = 1;
   walletMoveWeekendPayToFriday = false;
+  editingLoanId: string | null = null;
+  loanCreditor = '';
+  loanOriginalAmount: number | null = null;
+  loanRemainingAmount: number | null = null;
+  loanPaymentAmount: number | null = null;
+  loanPaymentSchedule: 'fixed' | 'weekly' | 'tentative' = 'fixed';
+  loanDueDay = 1;
+  loanDueWeekday = 1;
+  loanTentativePaymentDate = '';
+  loanNotes = '';
+  payingLoan: WalletLoan | null = null;
+  loanPaymentValue: number | null = null;
+  loanPaymentDate = '';
   returnToTreatmentManager = false;
   readonly medicationFrequencyOptions = [4, 6, 8, 12, 24];
   readonly medicationDurationOptions = [3, 4, 5, 7, 10, 14, 30];
   readonly medicationStockUnits = ['tabletas', 'cápsulas', 'dosis', 'ml'];
+  readonly loanWeekdays = [
+    { value: 0, label: 'Domingo' }, { value: 1, label: 'Lunes' }, { value: 2, label: 'Martes' },
+    { value: 3, label: 'Miércoles' }, { value: 4, label: 'Jueves' }, { value: 5, label: 'Viernes' }, { value: 6, label: 'Sábado' },
+  ];
 
   tareas: Task[] = [];
   secciones: TaskSection[] = [];
@@ -393,6 +433,20 @@ export class HomePage implements OnInit, OnDestroy {
   prioridad: TaskPriority = 'media';
   etiqueta: TaskLabel | undefined = undefined;
   taskInsistentReminder = false;
+  taskReminderEnabled = false;
+  taskReminderDate = '';
+  taskReminderTime = '09:00';
+  eventReminderMinutes: number | null = null;
+  readonly eventReminderOptions = [
+    { minutes: 0, label: 'A la hora del evento' },
+    { minutes: 5, label: '5 minutos antes' },
+    { minutes: 10, label: '10 minutos antes' },
+    { minutes: 15, label: '15 minutos antes' },
+    { minutes: 30, label: '30 minutos antes' },
+    { minutes: 60, label: '1 hora antes' },
+    { minutes: 120, label: '2 horas antes' },
+    { minutes: 1440, label: '1 día antes' },
+  ];
   actividadMadreId: number | undefined = undefined;
   favorita = false;
   repeticion: TaskRepeat = 'none';
@@ -461,6 +515,7 @@ export class HomePage implements OnInit, OnDestroy {
   closeCircleOutline,
       ellipsisHorizontal,
       giftOutline,
+      heartOutline,
       homeOutline,
       menuOutline,
       medicalOutline,
@@ -507,6 +562,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.medicationTreatments = this.wellnessService.loadTreatments();
     this.quickNotes = this.noteService.load();
     this.walletState = this.walletService.load();
+    this.selfCareState = this.selfCareService.load();
     void this.walletService.initializePersistence().then((state) => {
       this.walletState = state;
       this.syncNotifications();
@@ -585,6 +641,12 @@ export class HomePage implements OnInit, OnDestroy {
       this.walletService.changes$.subscribe((state) => {
         this.walletState = state;
         this.syncNotifications();
+        this.refreshView();
+      }),
+    );
+    this.liveStateSubscriptions.add(
+      this.selfCareService.changes$.subscribe((state) => {
+        this.selfCareState = state;
         this.refreshView();
       }),
     );
@@ -670,6 +732,10 @@ export class HomePage implements OnInit, OnDestroy {
       await this.menuController.close('settings-menu');
       return;
     }
+    if (await this.menuController.isOpen('main-menu')) {
+      await this.menuController.close('main-menu');
+      return;
+    }
 
     const topModal = document.querySelector<HTMLIonModalElement>(
       'ion-modal.modal-top, ion-modal.show-modal',
@@ -729,9 +795,13 @@ export class HomePage implements OnInit, OnDestroy {
       ];
       return homeOrder
         .flatMap((id) => this.secciones.filter((section) => section.id === id))
-        .map((section) => section.id === 'proximas'
-          ? { ...section, tareas: section.tareas.filter((tarea) => tarea.tipo === 'tarea') }
-          : section)
+        .map((section) => ({
+          ...section,
+          tareas: section.tareas.filter((tarea) => {
+            if (tarea.tipo === 'evento' && tarea.presetId !== undefined) return false;
+            return section.id !== 'proximas' || tarea.tipo === 'tarea';
+          }),
+        }))
         .filter((section) => section.tareas.length > 0);
     }
 
@@ -933,6 +1003,7 @@ export class HomePage implements OnInit, OnDestroy {
 
   selectView(view: ViewMode): void {
     this.selectedView = view;
+    this.titulo = view === 'cuidado' ? 'Mi autocuidado' : 'Agenda';
 
     if (view === 'hoy') {
       this.currentTime = new Date();
@@ -944,6 +1015,115 @@ export class HomePage implements OnInit, OnDestroy {
       void this.refreshDeviceCalendarEvents();
       setTimeout(() => this.scrollToCurrentHour());
     }
+  }
+
+  get selfCareTodayEntries(): Array<{ habit: SelfCareHabit; timeKey: string; completed: boolean }> {
+    const date = this.taskService.toISODate(this.currentTime);
+    const day = this.currentTime.getDay();
+    return this.selfCareState.habits
+      .filter((habit) => habit.days.includes(day))
+      .flatMap((habit) => (habit.times.length ? habit.times : ['Durante el día']).map((timeKey) => ({
+        habit, timeKey,
+        completed: this.selfCareState.completions.some((item) => item.habitId === habit.id && item.date === date && item.timeKey === timeKey),
+      })))
+      .filter((entry) => !this.selfCareState.lowEnergy || entry.habit.essential)
+      .filter((entry) => this.matchesSelfCareFilter(entry.timeKey));
+  }
+
+  get selfCareActiveEntries(): Array<{ habit: SelfCareHabit; timeKey: string; completed: boolean }> {
+    return this.selfCareTodayEntries.filter((entry) => !entry.completed);
+  }
+
+  get selfCareHistoryEntries(): Array<{ habit: SelfCareHabit; timeKey: string; completed: boolean }> {
+    return this.selfCareTodayEntries.filter((entry) => entry.completed);
+  }
+
+  get selfCareActiveMedicationEntries(): MedicationDose[] {
+    return this.selfCareMedicationEntries.filter((dose) => dose.status === 'pending');
+  }
+
+  get selfCareHistoryMedicationEntries(): MedicationDose[] {
+    return this.selfCareMedicationEntries.filter((dose) => dose.status === 'taken');
+  }
+
+  get selfCareProgress(): number {
+    const entries = this.selfCareTodayEntries;
+    const medication = this.selfCareMedicationEntries;
+    const total = entries.length + medication.length;
+    return total ? Math.round(((entries.filter((entry) => entry.completed).length + medication.filter((dose) => dose.status === 'taken').length) / total) * 100) : 0;
+  }
+
+  get selfCareTotalCount(): number { return this.selfCareTodayEntries.length + this.selfCareMedicationEntries.length; }
+
+  get selfCareCompletedCount(): number {
+    return this.selfCareTodayEntries.filter((entry) => entry.completed).length
+      + this.selfCareMedicationEntries.filter((dose) => dose.status === 'taken').length;
+  }
+
+  get selfCareMedicationEntries(): MedicationDose[] {
+    if (!this.wellnessSettings.enabled) return [];
+    return this.todayMedicationDoses.filter((dose) => dose.status === 'pending' || dose.status === 'taken');
+  }
+
+  toggleSelfCareEntry(habit: SelfCareHabit, timeKey: string): void {
+    this.selfCareState = this.selfCareService.toggleCompletion(habit.id, this.taskService.toISODate(this.currentTime), timeKey);
+  }
+
+  setSelfCareFilter(filter: SelfCareFilter): void { this.selfCareFilter = filter; }
+
+  setLowEnergyMode(enabled: boolean): void { this.selfCareState = this.selfCareService.setLowEnergy(enabled); }
+
+  setSelfCareEnabled(enabled: boolean): void {
+    this.selfCareState = this.selfCareService.setEnabled(enabled);
+    if (!enabled && this.selectedView === 'cuidado') this.selectView('hoy');
+  }
+
+  openSelfCareEditor(habit?: SelfCareHabit): void {
+    this.editingSelfCareHabitId = habit?.id ?? null;
+    this.selfCareName = habit?.name ?? '';
+    this.selfCareIcon = habit?.icon ?? '✨';
+    this.selfCareColor = habit?.color ?? '#8b5cf6';
+    this.selfCareDays = habit?.days ? [...habit.days] : [0,1,2,3,4,5,6];
+    this.selfCareTimes = habit?.times ? [...habit.times] : [];
+    this.selfCareTimeDraft = this.selfCareTimes.at(-1) ?? '08:00';
+    this.selfCareEssential = habit?.essential ?? false;
+    this.selfCareReminders = habit?.reminders ?? false;
+    this.selfCareEditorOpen = true;
+  }
+
+  saveSelfCareHabit(): void {
+    this.selfCareState = this.selfCareService.saveHabit({ name: this.selfCareName, icon: this.selfCareIcon, color: this.selfCareColor, days: this.selfCareDays, times: this.selfCareTimes, essential: this.selfCareEssential, reminders: this.selfCareReminders }, this.editingSelfCareHabitId ?? undefined);
+    if (this.selfCareName.trim()) this.selfCareEditorOpen = false;
+  }
+
+  deleteSelfCareHabit(): void {
+    if (!this.editingSelfCareHabitId) return;
+    this.selfCareState = this.selfCareService.deleteHabit(this.editingSelfCareHabitId);
+    this.selfCareEditorOpen = false;
+  }
+
+  toggleSelfCareDay(day: number): void {
+    this.selfCareDays = this.selfCareDays.includes(day) ? this.selfCareDays.filter((item) => item !== day) : [...this.selfCareDays, day];
+  }
+
+  addSelfCareTime(): void {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(this.selfCareTimeDraft)) return;
+    if (!this.selfCareTimes.includes(this.selfCareTimeDraft)) {
+      this.selfCareTimes = [...this.selfCareTimes, this.selfCareTimeDraft].sort();
+    }
+  }
+
+  removeSelfCareTime(time: string): void {
+    this.selfCareTimes = this.selfCareTimes.filter((item) => item !== time);
+  }
+
+  selfCareMedicationName(dose: MedicationDose): string { return this.medicationForDose(dose)?.name ?? 'Medicamento'; }
+
+  private matchesSelfCareFilter(timeKey: string): boolean {
+    if (this.selfCareFilter === 'daily' || this.selfCareFilter === 'mine') return true;
+    if (!/^\d{2}:\d{2}$/.test(timeKey)) return false;
+    const hour = Number(timeKey.slice(0, 2));
+    return this.selfCareFilter === 'morning' ? hour < 12 : hour >= 18;
   }
 
   async refreshPage(event: RefresherCustomEvent): Promise<void> {
@@ -1311,6 +1491,15 @@ export class HomePage implements OnInit, OnDestroy {
       prioridad: this.prioridad,
       etiqueta: this.etiqueta,
       insistentReminder: this.formItemType === 'tarea' && this.taskInsistentReminder,
+      reminderDate: this.formItemType === 'tarea' && this.taskReminderEnabled
+        ? this.taskReminderDate
+        : undefined,
+      reminderTime: this.formItemType === 'tarea' && this.taskReminderEnabled
+        ? this.taskReminderTime
+        : undefined,
+      eventReminderMinutes: this.formItemType === 'evento'
+        ? this.eventReminderMinutes ?? undefined
+        : undefined,
       favorita: this.favorita,
       repeticion: this.repeticion,
       parentId: this.formItemType === 'tarea' ? this.actividadMadreId : undefined,
@@ -1507,6 +1696,16 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaHora = '';
     this.nuevaHoraFin = '';
     this.repeticion = 'none';
+  }
+
+  setTaskReminderEnabled(enabled: boolean): void {
+    this.taskReminderEnabled = enabled;
+    if (!enabled) {
+      this.taskInsistentReminder = false;
+      return;
+    }
+    this.taskReminderDate ||= this.nuevaFecha || this.taskService.toISODate(this.currentTime);
+    this.taskReminderTime = this.taskReminderTime || this.nuevaHora || '09:00';
   }
 
   focusEndTime(input: IonInput): void {
@@ -2012,7 +2211,10 @@ export class HomePage implements OnInit, OnDestroy {
     if (this.walletView === 'transaction') return this.walletTransactionKind === 'expense' ? 'Registrar gasto' : 'Registrar ingreso';
     if (this.walletView === 'fixed') return this.editingFixedExpenseId ? 'Editar gasto fijo' : 'Nuevo gasto fijo';
     if (this.walletView === 'payment') return 'Registrar pago';
-    return 'Sueldo quincenal';
+    if (this.walletView === 'loans') return 'Préstamos';
+    if (this.walletView === 'loan-form') return this.editingLoanId ? 'Editar préstamo' : 'Nuevo préstamo';
+    if (this.walletView === 'loan-payment') return 'Registrar abono';
+    return 'Configuración de sueldo';
   }
 
   get homeFixedExpenses(): FixedExpenseOccurrence[] {
@@ -2047,15 +2249,28 @@ export class HomePage implements OnInit, OnDestroy {
       .slice(0, 30);
   }
 
+  loanPaymentHistory(loanId: string) {
+    return this.walletState.transactions
+      .filter((item) => item.type === 'loan-payment' && item.loanId === loanId)
+      .sort((left, right) => right.date.localeCompare(left.date) || right.createdAt.localeCompare(left.createdAt));
+  }
+
   async abrirBilletera(): Promise<void> {
     this.walletState = this.walletService.load();
     this.walletView = 'dashboard';
+    this.loansStandalone = false;
     await this.walletModal?.present();
   }
 
   cerrarBilletera(): void {
     this.walletView = 'dashboard';
+    this.loansStandalone = false;
     this.walletModal?.dismiss();
+  }
+
+  volverEnBilletera(): void {
+    this.walletView = 'dashboard';
+    this.loansStandalone = false;
   }
 
   nuevaTransaccionBilletera(kind: WalletTransactionKind = 'expense'): void {
@@ -2064,6 +2279,8 @@ export class HomePage implements OnInit, OnDestroy {
     this.walletAmount = null;
     this.walletCategory = kind === 'income' ? 'Otros' : 'Alimentos';
     this.walletDate = this.taskService.toISODate(new Date());
+    this.walletExpenseLoanId = null;
+    this.walletIncomeLoanId = null;
     this.walletView = 'transaction';
   }
 
@@ -2073,8 +2290,33 @@ export class HomePage implements OnInit, OnDestroy {
     await this.walletModal?.present();
   }
 
+  async nuevoIngresoDesdeFab(): Promise<void> {
+    this.walletState = this.walletService.load();
+    this.nuevaTransaccionBilletera('income');
+    await this.walletModal?.present();
+  }
+
   guardarTransaccionBilletera(): void {
     if (!this.walletDescription.trim() || !this.walletAmount || this.walletAmount <= 0 || !this.walletDate) return;
+    if (this.walletTransactionKind === 'expense' && this.walletCategory === 'Préstamo' && this.walletExpenseLoanId) {
+      const loan = this.walletState.loans.find((item) => item.id === this.walletExpenseLoanId);
+      if (!loan) return;
+      this.walletState = this.walletService.payLoan(loan, this.walletAmount, this.walletDate);
+      this.walletView = 'dashboard';
+      return;
+    }
+    if (this.walletTransactionKind === 'income' && this.walletCategory === 'Préstamo' && this.walletIncomeLoanId) {
+      const loan = this.walletState.loans.find((item) => item.id === this.walletIncomeLoanId);
+      if (!loan) return;
+      this.walletState = this.walletService.receiveLoanFunds(
+        loan,
+        this.walletAmount,
+        this.walletDate,
+        this.walletDescription,
+      );
+      this.walletView = 'dashboard';
+      return;
+    }
     this.walletState = this.walletService.addTransaction({
       kind: this.walletTransactionKind,
       description: this.walletDescription,
@@ -2119,10 +2361,69 @@ export class HomePage implements OnInit, OnDestroy {
     this.walletView = 'dashboard';
   }
 
+  verPrestamosDesdeBilletera(): void {
+    this.walletView = 'loans';
+    this.loansStandalone = false;
+  }
+
+  nuevoPrestamo(loan?: WalletLoan): void {
+    this.editingLoanId = loan?.id ?? null;
+    this.loanCreditor = loan?.creditor ?? '';
+    this.loanOriginalAmount = loan?.originalAmount ?? null;
+    this.loanRemainingAmount = loan?.remainingAmount ?? null;
+    this.loanPaymentAmount = loan?.paymentAmount ?? null;
+    this.loanPaymentSchedule = loan?.paymentSchedule ?? 'fixed';
+    this.loanDueDay = loan?.dueDay ?? 1;
+    this.loanDueWeekday = loan?.dueWeekday ?? 1;
+    this.loanTentativePaymentDate = loan?.tentativePaymentDate ?? '';
+    this.loanNotes = loan?.notes ?? '';
+    this.walletView = 'loan-form';
+  }
+
+  guardarPrestamo(): void {
+    if (!this.loanCreditor.trim() || !this.loanOriginalAmount || !this.loanPaymentAmount) return;
+    this.walletState = this.walletService.saveLoan({
+      creditor: this.loanCreditor,
+      originalAmount: this.loanOriginalAmount,
+      remainingAmount: this.loanRemainingAmount ?? this.loanOriginalAmount,
+      paymentAmount: this.loanPaymentAmount,
+      paymentSchedule: this.loanPaymentSchedule,
+      dueDay: this.loanDueDay,
+      dueWeekday: this.loanDueWeekday,
+      tentativePaymentDate: this.loanTentativePaymentDate,
+      notes: this.loanNotes,
+      active: true,
+    }, this.editingLoanId ?? undefined);
+    this.walletView = 'loans';
+  }
+
+  eliminarPrestamo(id: string): void {
+    this.walletState = this.walletService.deleteLoan(id);
+    this.walletView = 'loans';
+  }
+
+  abrirPagoPrestamo(loan: WalletLoan): void {
+    this.payingLoan = loan;
+    this.loanPaymentValue = Math.min(loan.paymentAmount, loan.remainingAmount);
+    this.loanPaymentDate = this.taskService.toISODate(this.currentTime);
+    this.walletView = 'loan-payment';
+  }
+
+  guardarPagoPrestamo(): void {
+    if (!this.payingLoan || !this.loanPaymentValue || !this.loanPaymentDate) return;
+    this.walletState = this.walletService.payLoan(this.payingLoan, this.loanPaymentValue, this.loanPaymentDate);
+    this.walletView = 'loans';
+  }
+
+  loanWeekdayLabel(day: number): string {
+    return this.loanWeekdays.find((item) => item.value === day)?.label ?? 'Lunes';
+  }
+
   editarSueldo(): void {
     this.walletSalaryAmount = this.walletState.settings.salaryAmount || null;
     this.walletPaySchedule = this.walletState.settings.paySchedule;
     this.walletFirstPayDate = this.walletState.settings.firstPayDate || this.taskService.toISODate(new Date());
+    this.walletWeeklyPayDay = this.walletState.settings.weeklyPayDay ?? 1;
     this.walletMoveWeekendPayToFriday = this.walletState.settings.moveWeekendPayToFriday;
     this.walletView = 'settings';
   }
@@ -2132,6 +2433,7 @@ export class HomePage implements OnInit, OnDestroy {
       salaryAmount: Math.max(0, Number(this.walletSalaryAmount) || 0),
       paySchedule: this.walletPaySchedule,
       firstPayDate: this.walletFirstPayDate || this.taskService.toISODate(new Date()),
+      weeklyPayDay: this.walletWeeklyPayDay,
       moveWeekendPayToFriday: this.walletMoveWeekendPayToFriday,
       currency: 'MXN',
     });
@@ -2226,6 +2528,20 @@ export class HomePage implements OnInit, OnDestroy {
   async abrirPanelConfiguracion(): Promise<void> {
     await this.refreshBatteryOptimizationStatus();
     await this.menuController.open('settings-menu');
+  }
+
+  async abrirMenuPrincipal(): Promise<void> { await this.menuController.open('main-menu'); }
+  async cerrarMenuPrincipal(): Promise<void> { await this.menuController.close('main-menu'); }
+
+  async abrirBuscadorDesdeMenu(): Promise<void> { await this.cerrarMenuPrincipal(); await this.abrirBuscadorGlobal(); }
+  async abrirNotasDesdeMenu(): Promise<void> { await this.cerrarMenuPrincipal(); await this.abrirNotas(); }
+  async abrirBilleteraDesdeMenu(): Promise<void> { await this.cerrarMenuPrincipal(); await this.abrirBilletera(); }
+  async abrirRutinasDesdeMenu(): Promise<void> { await this.cerrarMenuPrincipal(); await this.abrirPreestablecidos(); }
+  async abrirEtiquetasDesdeMenu(): Promise<void> { await this.cerrarMenuPrincipal(); await this.abrirConfiguracion(); }
+  async abrirTratamientosDesdeMenu(): Promise<void> {
+    await this.cerrarMenuPrincipal();
+    if (!this.wellnessSettings.enabled) this.setWellnessEnabled(true);
+    await this.abrirTratamientos();
   }
 
   cerrarPanelConfiguracion(): void {
@@ -3116,6 +3432,10 @@ export class HomePage implements OnInit, OnDestroy {
     if (enabled) this.expandedReminderLabel = label;
   }
 
+  setLabelInsistentEnabled(label: TaskLabel, insistentEnabled: boolean): void {
+    this.updateLabelReminderSettings(label, { insistentEnabled });
+  }
+
   toggleReminderLead(label: TaskLabel, minutes: ReminderLeadMinutes): void {
     const current = this.reminderSettingsFor(label);
     const advanceMinutes = current.advanceMinutes.includes(minutes)
@@ -3380,6 +3700,10 @@ export class HomePage implements OnInit, OnDestroy {
     this.prioridad = 'media';
     this.etiqueta = undefined;
     this.taskInsistentReminder = false;
+    this.taskReminderEnabled = false;
+    this.taskReminderDate = '';
+    this.taskReminderTime = '09:00';
+    this.eventReminderMinutes = null;
     this.actividadMadreId = undefined;
     this.favorita = false;
     this.repeticion = 'none';
@@ -3397,6 +3721,10 @@ export class HomePage implements OnInit, OnDestroy {
     this.prioridad = tarea.prioridad;
     this.etiqueta = tarea.etiqueta;
     this.taskInsistentReminder = tarea.insistentReminder === true;
+    this.taskReminderDate = tarea.reminderDate ?? '';
+    this.taskReminderTime = tarea.reminderTime ?? '09:00';
+    this.taskReminderEnabled = !!this.taskReminderDate && !!tarea.reminderTime;
+    this.eventReminderMinutes = tarea.eventReminderMinutes ?? null;
     this.actividadMadreId = tarea.parentId;
     this.favorita = tarea.favorita ?? false;
     this.repeticion = tarea.repeticion ?? 'none';
