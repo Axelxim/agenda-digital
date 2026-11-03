@@ -846,7 +846,9 @@ export class TaskService {
 
     const source = new Date(`${fecha}T00:00:00`);
     const day = source.getDate();
-    const nextMonth = new Date(source.getFullYear(), source.getMonth() + 1, 1);
+    const nextMonth = repetition === 'yearly'
+      ? new Date(source.getFullYear() + 1, source.getMonth(), 1)
+      : new Date(source.getFullYear(), source.getMonth() + 1, 1);
     const lastDay = new Date(
       nextMonth.getFullYear(),
       nextMonth.getMonth() + 1,

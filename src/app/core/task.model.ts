@@ -1,6 +1,6 @@
 export type TaskPriority = 'baja' | 'media' | 'alta';
 export type TaskStatus = 'pendiente' | 'completada' | 'vencida' | 'ignorada';
-export type TaskRepeat = 'none' | 'daily' | 'weekly' | 'monthly';
+export type TaskRepeat = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type TaskSyncStatus = 'pending' | 'synced' | 'conflict';
 export type RecurrenceScope = 'one' | 'following' | 'all';
 export type TaskType = 'evento' | 'tarea';

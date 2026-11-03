@@ -60,4 +60,6 @@
 .editor-time-row { align-items: start; }
 .editor-repeat, .editor-color { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; }
 .editor-repeat ion-icon, .editor-color ion-icon { position: static; margin: 0; }
+.birthday-repeat { grid-template-columns: 22px minmax(0, 1fr) 22px auto; }
+.birthday-repeat .birthday-repeat-check { color: var(--primary); font-size: 21px; }
 ion-header.app-header.editor-open { display: none; }

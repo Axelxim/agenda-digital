@@ -580,6 +580,10 @@
       </label>
       }
 
+      @if (!editingExternalEvent && writableDeviceCalendars.length > 0) {
+      <div class="reminder-setting-row"><span><strong>Sincronizar con el calendario del teléfono</strong><small>También crea una copia externa</small></span><ion-toggle [(ngModel)]="syncEventToDeviceCalendar"></ion-toggle></div>
+      }
+
       @if (calendarEditError) { <p class="time-validation">{{ calendarEditError }}</p> }
       @if (editingExternalEvent?.externalRecurring) {
       <p class="time-validation" style="color:var(--muted)">Los cambios se aplicarán a toda la serie.</p>
@@ -620,16 +624,15 @@
           <ion-input type="date" [(ngModel)]="birthdayDate"></ion-input>
         </label>
 
-        <button type="button" class="editor-field editor-repeat" (click)="birthdayRepeatExpanded = !birthdayRepeatExpanded" [attr.aria-expanded]="birthdayRepeatExpanded">
+        <button type="button" class="editor-field editor-repeat birthday-repeat" (click)="birthdayRepeatsYearly = !birthdayRepeatsYearly" [attr.aria-pressed]="birthdayRepeatsYearly">
           <ion-icon name="repeat-outline"></ion-icon>
           <span>Repetir</span>
+          <ion-icon class="birthday-repeat-check" [name]="birthdayRepeatsYearly ? 'checkbox-outline' : 'square-outline'" aria-hidden="true"></ion-icon>
           <small>{{ birthdayRepeatsYearly ? 'Cada año' : 'Nunca' }}</small>
         </button>
-        @if (birthdayRepeatExpanded) {
-        <div class="repeat-options" role="group" aria-label="Repetición del cumpleaños">
-          <button type="button" [class.selected]="!birthdayRepeatsYearly" (click)="birthdayRepeatsYearly = false; birthdayRepeatExpanded = false">Nunca</button>
-          <button type="button" [class.selected]="birthdayRepeatsYearly" (click)="birthdayRepeatsYearly = true; birthdayRepeatExpanded = false">Cada año</button>
-        </div>
+
+        @if (writableDeviceCalendars.length > 0) {
+        <div class="reminder-setting-row"><span><strong>Sincronizar con el calendario del teléfono</strong><small>También crea una copia externa</small></span><ion-toggle [(ngModel)]="syncBirthdayToDeviceCalendar"></ion-toggle></div>
         }
 
         @if (birthdaySaveError) { <p class="time-validation">{{ birthdaySaveError }}</p> }

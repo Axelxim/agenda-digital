@@ -60,6 +60,7 @@ import {
       pencilOutline,
       playOutline,
       repeatOutline,
+      squareOutline,
   saveOutline,
   searchOutline,
   settingsOutline,
@@ -266,6 +267,8 @@ export class HomePage implements OnInit, OnDestroy {
   birthdayNameValue = '';
   birthdayDate = '';
   birthdayRepeatsYearly = true;
+  syncBirthdayToDeviceCalendar = false;
+  syncEventToDeviceCalendar = false;
   birthdaySaveError = '';
   confirmingEventDeletion = false;
   expandedTaskId: number | null = null;
@@ -530,6 +533,7 @@ export class HomePage implements OnInit, OnDestroy {
   pencilOutline,
   playOutline,
   repeatOutline,
+  squareOutline,
       saveOutline,
       searchOutline,
       settingsOutline,
@@ -957,6 +961,7 @@ export class HomePage implements OnInit, OnDestroy {
   get willSaveEventToDeviceCalendar(): boolean {
     return this.formItemType === 'evento'
       && this.editingTaskId === null
+      && this.syncEventToDeviceCalendar
       && !!this.deviceCalendarSettings.destinationCalendarId;
   }
 
@@ -1318,6 +1323,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.birthdayNameValue = '';
     this.birthdayDate = '';
     this.birthdayRepeatsYearly = true;
+    this.syncBirthdayToDeviceCalendar = false;
     this.birthdayRepeatExpanded = false;
     this.birthdaySaveError = '';
     this.birthdayEditorOpen = true;
@@ -1333,13 +1339,26 @@ export class HomePage implements OnInit, OnDestroy {
     const name = this.birthdayNameValue.trim();
     if (!name || !this.birthdayDate) return;
 
-    const calendarId = this.deviceCalendarSettings.destinationCalendarId;
-    if (!calendarId) {
-      this.birthdaySaveError = 'Selecciona en Más el calendario para eventos nuevos.';
+    this.birthdaySaveError = '';
+    this.setTasks(this.taskService.create({
+      titulo: `Cumpleaños de ${name}`,
+      tipo: 'evento',
+      fecha: this.nextBirthdayDate(this.birthdayDate),
+      color: '#c45b86',
+      prioridad: 'media',
+      repeticion: this.birthdayRepeatsYearly ? 'yearly' : 'none',
+    }));
+
+    if (!this.syncBirthdayToDeviceCalendar) {
+      this.cerrarEditorCumpleanos();
       return;
     }
 
-    this.birthdaySaveError = '';
+    const calendarId = this.deviceCalendarSettings.destinationCalendarId ?? this.writableDeviceCalendars[0]?.id;
+    if (!calendarId) {
+      this.birthdaySaveError = 'Se guardó en Todo en Orden. Para sincronizarlo, activa Calendarios del dispositivo desde el menú.';
+      return;
+    }
     try {
       await this.deviceCalendarService.createEvent({
         calendarId,
@@ -1526,12 +1545,14 @@ export class HomePage implements OnInit, OnDestroy {
     }
 
     const destinationCalendarId = this.deviceCalendarSettings.destinationCalendarId;
-    if (this.editingTaskId === null && this.formItemType === 'evento' && destinationCalendarId) {
+    if (this.editingTaskId === null && this.formItemType === 'evento' && this.syncEventToDeviceCalendar && destinationCalendarId) {
       if (!this.nuevaFecha) {
         this.calendarEditError = 'Selecciona una fecha para sincronizar el evento.';
         return;
       }
       this.calendarEditError = '';
+      // La Agenda conserva siempre su propio evento; la sincronización es una copia opcional.
+      this.setTasks(this.taskService.create(draft));
       try {
         await this.deviceCalendarService.createEvent({
           calendarId: destinationCalendarId,
@@ -1697,6 +1718,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.nuevaHora = '';
     this.nuevaHoraFin = '';
     this.repeticion = 'none';
+    this.syncEventToDeviceCalendar = false;
   }
 
   setTaskReminderEnabled(enabled: boolean): void {
@@ -3196,6 +3218,16 @@ export class HomePage implements OnInit, OnDestroy {
     return Math.max(0, Math.round((endDate - startDate) / 86_400_000));
   }
 
+  private nextBirthdayDate(date: string): string {
+    const [, month, day] = date.split('-').map(Number);
+    const today = this.currentTime;
+    let candidate = new Date(today.getFullYear(), month - 1, day);
+    if (candidate < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+      candidate = new Date(today.getFullYear() + 1, month - 1, day);
+    }
+    return this.taskService.toISODate(candidate);
+  }
+
   private addCalendarDays(date: string, days: number): string {
     const value = new Date(`${date}T12:00:00`);
     value.setDate(value.getDate() + days);
@@ -3245,6 +3277,12 @@ export class HomePage implements OnInit, OnDestroy {
         ...this.deviceCalendarSettings,
         selectedCalendarIds: this.deviceCalendars.map((calendar) => calendar.id),
         selectionConfigured: true,
+      };
+    }
+    if (!this.deviceCalendarSettings.destinationCalendarId) {
+      this.deviceCalendarSettings = {
+        ...this.deviceCalendarSettings,
+        destinationCalendarId: this.writableDeviceCalendars[0]?.id,
       };
     }
     this.deviceCalendarService.saveSettings(this.deviceCalendarSettings);
@@ -3356,6 +3394,12 @@ export class HomePage implements OnInit, OnDestroy {
         ...this.deviceCalendarSettings,
         selectedCalendarIds: this.deviceCalendars.map((calendar) => calendar.id),
         selectionConfigured: true,
+      };
+    }
+    if (!this.deviceCalendarSettings.destinationCalendarId) {
+      this.deviceCalendarSettings = {
+        ...this.deviceCalendarSettings,
+        destinationCalendarId: this.writableDeviceCalendars[0]?.id,
       };
     }
     this.deviceCalendarService.saveSettings(this.deviceCalendarSettings);
@@ -3758,6 +3802,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.actividadMadreId = tarea.parentId;
     this.favorita = tarea.favorita ?? false;
     this.repeticion = tarea.repeticion ?? 'none';
+    this.syncEventToDeviceCalendar = false;
   }
 
   private buildCalendar(): void {
