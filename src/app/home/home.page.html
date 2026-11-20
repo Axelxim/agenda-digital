@@ -921,6 +921,8 @@
               <ion-input label="Hora de fin" label-placement="stacked" type="time" [(ngModel)]="presetHoraFin" (ngModelChange)="actualizarHorarioPreestablecido()"></ion-input>
             </div>
             <label class="color-picker">Color <input type="color" [(ngModel)]="presetColor" /></label>
+            <div class="medication-stock-toggle"><span><strong>Alarma al agregar a la semana</strong><small>Creará un aviso para cada evento de esta rutina.</small></span><ion-toggle [(ngModel)]="presetAlarmEnabled"></ion-toggle></div>
+            @if (presetAlarmEnabled) {<ion-select label="Avisar" label-placement="stacked" [(ngModel)]="presetAlarmMinutes">@for (option of eventReminderOptions; track option.minutes) {<ion-select-option [value]="option.minutes">{{ option.label }}</ion-select-option>}</ion-select>}
             <div class="day-picker"><span>Días — toca uno para asignar su horario</span><div>@for (day of diasSemana; track day; let index = $index) {<button type="button" class="day-button" [style.background-color]="presetDias.includes(index) ? '#2563eb' : '#171b24'" [style.border-color]="presetDias.includes(index) ? '#60a5fa' : '#344054'" [style.color]="presetDias.includes(index) ? '#ffffff' : '#a5b0c3'" (click)="togglePresetDay(index)">{{ day }}</button>}</div>@if (presetActiveDay !== null) {<button type="button" class="remove-day" (click)="quitarDiaPreestablecido()">Quitar día seleccionado</button>}</div>
             <ion-button (click)="guardarPreestablecido()" [disabled]="!presetNombre.trim()">{{ editingPresetId === null ? 'Guardar rutina' : 'Guardar cambios' }}</ion-button>
             <ion-button fill="outline" (click)="cancelarEdicionPreestablecido()">Cancelar</ion-button>
@@ -936,7 +938,7 @@
       <ion-header>
         <ion-toolbar>
           <ion-buttons slot="start"><ion-button fill="clear" aria-label="Volver" (click)="volverDesdeBienestar()"><ion-icon name="chevron-back-outline"></ion-icon></ion-button></ion-buttons>
-          <ion-title>{{ wellnessView === 'treatment' ? 'Nuevo tratamiento' : editingMedicationId ? 'Editar medicamento' : 'Agregar medicamento' }}</ion-title>
+          <ion-title>{{ wellnessView === 'treatment' ? (editingTreatmentGroupKey ? 'Editar tratamiento' : 'Nuevo tratamiento') : editingMedicationId ? 'Editar medicamento' : 'Agregar medicamento' }}</ion-title>
         </ion-toolbar>
       </ion-header>
       <ion-content class="modal-content">
@@ -961,7 +963,7 @@
             }
           </div>
           <button type="button" class="add-treatment-medication" (click)="agregarMedicamentoAlTratamiento()"><ion-icon name="add"></ion-icon>Agregar otro medicamento</button>
-          <button type="button" class="save-treatment-button" [disabled]="!treatmentName.trim() || !treatmentStartDate || treatmentMedicationDrafts.length === 0" (click)="guardarNuevoTratamiento()">Guardar tratamiento</button>
+          <button type="button" class="save-treatment-button" [disabled]="!treatmentName.trim() || !treatmentStartDate || treatmentMedicationDrafts.length === 0" (click)="guardarNuevoTratamiento()">{{ editingTreatmentGroupKey ? 'Guardar cambios' : 'Guardar tratamiento' }}</button>
         </section>
         } @else {
         <section class="medication-quick-editor">
@@ -1083,6 +1085,7 @@
                 </div>
                 <button type="button" class="view-treatment-history" (click)="abrirHistorialTratamiento(group)"><ion-icon name="time-outline"></ion-icon>Ver historial completo</button>
                 <div class="treatment-group-actions">
+                  <button type="button" (click)="editarPlanTratamiento(group)"><ion-icon name="pencil-outline"></ion-icon><span>Editar plan</span></button>
                   <button type="button" (click)="cambiarEstadoTratamiento(group, group.status === 'active' ? 'paused' : 'active')"><ion-icon [name]="group.status === 'active' ? 'pause-outline' : 'play-outline'"></ion-icon><span>{{ group.status === 'active' ? 'Pausar' : 'Reactivar' }}</span></button>
                   @if (group.status !== 'finished') {
                   <button type="button" (click)="cambiarEstadoTratamiento(group, 'finished')"><ion-icon name="stop-circle-outline"></ion-icon><span>Finalizar</span></button>

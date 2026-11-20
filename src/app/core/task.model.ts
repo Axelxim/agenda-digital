@@ -91,6 +91,8 @@ export interface EventPreset {
   horaFin: string;
   dias: number[];
   horarios?: EventPresetSchedule[];
+  alarmEnabled?: boolean;
+  alarmMinutes?: number;
 }
 
 export interface EventPresetSchedule {

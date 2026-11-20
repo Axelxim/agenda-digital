@@ -222,6 +222,7 @@ export class TaskService {
       estado: 'pendiente' as const,
       favorita: false,
       repeticion: 'none' as const,
+      eventReminderMinutes: preset.alarmEnabled ? preset.alarmMinutes ?? 0 : undefined,
       };
       });
 
@@ -939,6 +940,10 @@ export class TaskService {
             typeof schedule.horaFin === 'string',
           )
         : [],
+      alarmEnabled: preset.alarmEnabled === true,
+      alarmMinutes: typeof preset.alarmMinutes === 'number' && preset.alarmMinutes >= 0
+        ? preset.alarmMinutes
+        : 0,
     }));
   }
 

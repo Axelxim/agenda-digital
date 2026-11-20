@@ -117,6 +117,7 @@ type WalletView = 'dashboard' | 'transaction' | 'fixed' | 'payment' | 'settings'
 
 interface TreatmentMedicationDraft {
   key: string;
+  treatmentId?: string;
   name: string;
   dose: string;
   instructions: string;
@@ -307,6 +308,7 @@ export class HomePage implements OnInit, OnDestroy {
   treatmentName = '';
   treatmentStartDate = '';
   treatmentMedicationDrafts: TreatmentMedicationDraft[] = [];
+  editingTreatmentGroupKey: string | null = null;
   editingDraftKey: string | null = null;
   editingMedicationId: string | null = null;
   medicationName = '';
@@ -431,6 +433,8 @@ export class HomePage implements OnInit, OnDestroy {
   presetDias: number[] = [];
   presetHorarios: EventPresetSchedule[] = [];
   presetActiveDay: number | null = null;
+  presetAlarmEnabled = false;
+  presetAlarmMinutes = 0;
   editingPresetId: number | null = null;
   routineEditorOpen = false;
   prioridad: TaskPriority = 'media';
@@ -1861,6 +1865,8 @@ export class HomePage implements OnInit, OnDestroy {
       horaFin: this.presetHoraFin,
       dias: this.presetDias,
       horarios: this.presetHorarios,
+      alarmEnabled: this.presetAlarmEnabled,
+      alarmMinutes: this.presetAlarmMinutes,
     };
     this.preestablecidos = this.editingPresetId === null
       ? this.taskService.saveEventPreset(preset)
@@ -1881,6 +1887,8 @@ export class HomePage implements OnInit, OnDestroy {
     this.presetHorarios = preset.horarios?.length
       ? preset.horarios.map((item) => ({ ...item }))
       : preset.dias.map((dia) => ({ dia, horaInicio: preset.horaInicio, horaFin: preset.horaFin }));
+    this.presetAlarmEnabled = preset.alarmEnabled === true;
+    this.presetAlarmMinutes = preset.alarmMinutes ?? 0;
     this.presetActiveDay = this.presetDias[0] ?? null;
     if (this.presetActiveDay !== null) this.togglePresetDay(this.presetActiveDay);
   }
@@ -1902,6 +1910,8 @@ export class HomePage implements OnInit, OnDestroy {
     this.presetHoraFin = '10:00';
     this.presetDias = [];
     this.presetHorarios = [];
+    this.presetAlarmEnabled = false;
+    this.presetAlarmMinutes = 0;
     this.presetActiveDay = null;
     this.editingPresetId = null;
   }
@@ -2640,6 +2650,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.treatmentName = '';
     this.treatmentStartDate = this.taskService.toISODate(new Date());
     this.treatmentMedicationDrafts = [];
+    this.editingTreatmentGroupKey = null;
     this.wellnessView = 'treatment';
   }
 
@@ -2726,6 +2737,34 @@ export class HomePage implements OnInit, OnDestroy {
     await this.wellnessModal?.present();
   }
 
+  async editarPlanTratamiento(group: TreatmentGroup): Promise<void> {
+    this.returnToTreatmentManager = true;
+    this.editingTreatmentGroupKey = group.key;
+    this.treatmentName = group.name;
+    this.treatmentStartDate = group.startDate;
+    this.treatmentMedicationDrafts = group.treatments.map((treatment) => ({
+      key: treatment.id,
+      treatmentId: treatment.id,
+      name: treatment.name,
+      dose: treatment.dose,
+      instructions: treatment.instructions ?? '',
+      frequencyHours: this.inferMedicationFrequency(treatment.schedule.times),
+      durationDays: treatment.continuous ? null : this.daysBetween(treatment.startDate, treatment.endDate ?? treatment.startDate) + 1,
+      firstTime: treatment.schedule.times[0] ?? '08:00',
+      color: treatment.color,
+      strictTracking: treatment.strictTracking,
+      insistentReminder: treatment.insistentReminder,
+      stockEnabled: treatment.stockEnabled,
+      stockQuantity: treatment.stockQuantity,
+      doseUnits: treatment.doseUnits,
+      stockUnit: treatment.stockUnit,
+      lowStockThreshold: treatment.lowStockThreshold,
+    }));
+    this.wellnessView = 'treatment';
+    await this.treatmentsModal?.dismiss();
+    await this.wellnessModal?.present();
+  }
+
   get calculatedMedicationTimes(): string[] {
     const [hours, minutes] = this.medicationFirstTime.split(':').map(Number);
     if (!Number.isFinite(hours) || !Number.isFinite(minutes) || this.medicationFrequencyHours <= 0) return [];
@@ -2787,6 +2826,7 @@ export class HomePage implements OnInit, OnDestroy {
 
     const draft: TreatmentMedicationDraft = {
       key: this.editingDraftKey ?? this.createMedicationDraftKey(),
+      treatmentId: this.treatmentMedicationDrafts.find((item) => item.key === this.editingDraftKey)?.treatmentId,
       name: this.medicationName.trim(),
       dose: this.medicationDose.trim(),
       instructions: this.medicationInstructions.trim(),
@@ -2811,6 +2851,14 @@ export class HomePage implements OnInit, OnDestroy {
 
   guardarNuevoTratamiento(): void {
     if (!this.treatmentName.trim() || !this.treatmentStartDate || this.treatmentMedicationDrafts.length === 0) return;
+    const existingGroup = this.editingTreatmentGroupKey
+      ? this.treatmentGroups.find((group) => group.key === this.editingTreatmentGroupKey)
+      : undefined;
+    if (existingGroup) {
+      const retained = new Set(this.treatmentMedicationDrafts.flatMap((item) => item.treatmentId ? [item.treatmentId] : []));
+      const removed = existingGroup.treatments.filter((item) => !retained.has(item.id)).map((item) => item.id);
+      if (removed.length) this.wellnessService.deleteTreatments(removed);
+    }
     for (const medication of this.treatmentMedicationDrafts) {
       this.medicationName = medication.name;
       this.medicationDose = medication.dose;
@@ -2827,6 +2875,7 @@ export class HomePage implements OnInit, OnDestroy {
       this.medicationLowStockThreshold = medication.lowStockThreshold;
       this.medicationTreatments = this.wellnessService.saveTreatment(
         this.buildTreatmentDraft(this.treatmentStartDate),
+        medication.treatmentId,
       );
     }
     this.medicationDoses = this.wellnessService.getDoses();
@@ -3164,6 +3213,7 @@ export class HomePage implements OnInit, OnDestroy {
     this.treatmentName = '';
     this.treatmentStartDate = '';
     this.treatmentMedicationDrafts = [];
+    this.editingTreatmentGroupKey = null;
     this.resetMedicationForm();
   }
 
